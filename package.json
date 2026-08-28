@@ -1,0 +1,29 @@
+{
+	"name": "@harness/kernel",
+	"version": "0.1.0",
+	"description": "A test kernel that knows nothing about any target: the run, the eight verdicts, the ledgers and the reporting",
+	"license": "MIT",
+	"type": "module",
+	"engines": { "node": ">=20.19.0" },
+	"main": "./dist/src/index.js",
+	"types": "./dist/src/index.d.ts",
+	"exports": { ".": "./dist/src/index.js" },
+	"files": ["dist", "src", "README.md", "CHANGELOG.md"],
+	"bin": { "harness-selfcheck": "./bin/harness-selfcheck" },
+	"scripts": {
+		"build": "tsc -p .",
+		"prepare": "tsc -p . || true",
+		"typecheck": "tsc --noEmit -p .",
+		"test": "node --test dist/tests/",
+		"lint": "eslint .",
+		"format:check": "prettier --check ."
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.39.0",
+		"@types/node": "^20.19.9",
+		"eslint": "^9.39.0",
+		"prettier": "^3.9.6",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.68.0"
+	}
+}
