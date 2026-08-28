@@ -12,7 +12,7 @@
 	"bin": { "harness-selfcheck": "./bin/harness-selfcheck" },
 	"scripts": {
 		"build": "tsc -p .",
-		"prepare": "tsc -p . || true",
+		"prepare": "tsc -p .",
 		"typecheck": "tsc --noEmit -p .",
 		"test": "node --test dist/tests/",
 		"lint": "eslint .",
