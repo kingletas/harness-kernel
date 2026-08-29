@@ -23,7 +23,7 @@ make selfcheck-loud
   check that cannot mean anything against a target reports `unsupported` and
   names the missing capability; it never fails and is never silently absent.
 - **A worker pool with a declared width**, and a circuit breaker whose
-  *consecutive* means "with nothing reaching the target in between" so it still
+  _consecutive_ means "with nothing reaching the target in between" so it still
   means something once checks interleave.
 - **Five ledgers** — the signature, the measurement baseline, the drift ledger,
   the flake ledger and the quarantine list — and one flag that spares all of
