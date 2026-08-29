@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
@@ -79,5 +79,29 @@ describe('ArtefactStore', () => {
 
 		assert.deepEqual(kept.collect('two.check').artefacts, [])
 		assert.equal(kept.collect('one.check').artefacts.length, 1)
+	})
+})
+
+describe('a check that needs no explaining leaves nothing', () => {
+	it('removes the directory it was given', () => {
+		const kept = store()
+		const dir = kept.dirFor('a.check')
+		write(dir, 'trace.zip', 100)
+
+		kept.discard('a.check')
+
+		assert.equal(existsSync(dir), false)
+	})
+
+	it('removes a directory whose claims all came to nothing', () => {
+		// Playwright leaves an empty video folder behind even when the recording is
+		// deleted, and a tree of those reads as though every check produced evidence.
+		const kept = store()
+		const dir = kept.dirFor('a.check')
+		mkdirSync(join(dir, 'video'))
+		kept.claim('a.check', 'video', join(dir, 'video', 'never-written.webm'))
+
+		assert.deepEqual(kept.collect('a.check').artefacts, [])
+		assert.equal(existsSync(dir), false)
 	})
 })

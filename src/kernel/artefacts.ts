@@ -49,6 +49,12 @@ export class ArtefactStore {
 		this.claims.set(checkId, held)
 	}
 
+	/** Drops everything this check produced, for a verdict that needs no explaining. */
+	discard(checkId: string): void {
+		this.claims.delete(checkId)
+		rmSync(join(this.root, 'artefacts', checkId), { recursive: true, force: true })
+	}
+
 	/**
 	 * Turns this check's claims into artefacts, dropping what was never written
 	 * and deleting what the run can no longer afford.
@@ -74,6 +80,10 @@ export class ArtefactStore {
 			this.spent += bytes
 			artefacts.push({ kind, path: relative(this.root, absolute), bytes })
 		}
+
+		// A directory that kept nothing is litter, and a tree of them reads as
+		// though every check produced evidence.
+		if (artefacts.length === 0) this.discard(checkId)
 
 		return dropped === undefined ? { artefacts } : { artefacts, dropped }
 	}
