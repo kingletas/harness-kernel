@@ -119,11 +119,12 @@ export const reportToConsole = (
 		}
 		// Named on the line that failed, not left for somebody to find: on a remote
 		// runner the files are all anyone will ever get.
-		if (first.artefacts.length > 0) {
+		const [firstArtefact] = first.artefacts
+		if (firstArtefact !== undefined) {
 			const total = first.artefacts.reduce((sum, artefact) => sum + artefact.bytes, 0)
 			const kinds = first.artefacts.map(artefact => artefact.kind).join(', ')
 			write(
-				`        evidence: ${kinds} (${Math.round(total / 1024)}KB) in ${dirOf(first.artefacts[0]!.path)}`,
+				`        evidence: ${kinds} (${Math.round(total / 1024)}KB) in ${dirOf(firstArtefact.path)}`,
 			)
 		}
 		if (group.length > 1) {
