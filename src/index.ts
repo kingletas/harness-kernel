@@ -3,6 +3,7 @@
  * this file: anything not exported here is the kernel's own business.
  */
 export * from './kernel/areas.js'
+export * from './kernel/artefacts.js'
 export * from './kernel/capabilities.js'
 export * from './kernel/check.js'
 export * from './kernel/circuit.js'

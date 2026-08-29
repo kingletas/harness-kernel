@@ -132,8 +132,13 @@ export const runCheck = async (
 	 * Evidence is kept only where the verdict needs explaining. A passing check
 	 * that left a trace behind is a disk filling up for nothing.
 	 */
-	const collect = (verdict: Verdict): { artefacts: readonly Artefact[]; dropped?: string } =>
-		store === undefined || verdict === 'pass' ? { artefacts: [] } : store.collect(definition.id)
+	const collect = (verdict: Verdict): { artefacts: readonly Artefact[]; dropped?: string } => {
+		if (store === undefined) return { artefacts: [] }
+		if (verdict !== 'pass') return store.collect(definition.id)
+
+		store.discard(definition.id)
+		return { artefacts: [] }
+	}
 
 	const policy = definition.retry ?? environment.retry
 	const attempts: Attempt[] = []

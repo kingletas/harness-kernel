@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it } from 'node:test'
+import { ArtefactStore } from '../../src/kernel/artefacts.js'
 import { NO_CAPABILITIES } from '../../src/kernel/capabilities.js'
 import { defaultEnvironment, runCheck, type CheckDefinition } from '../../src/kernel/check.js'
 import { CircuitBreaker } from '../../src/kernel/circuit.js'
@@ -190,5 +194,61 @@ describe('runCheck', () => {
 		await runCheck(definition, environmentWith())
 
 		assert.equal(seen[1], first)
+	})
+})
+
+describe('evidence a check left behind', () => {
+	const withStore = () => {
+		const root = mkdtempSync(join(tmpdir(), 'run-'))
+		return { root, environment: environmentWith({ artefacts: new ArtefactStore(root) }) }
+	}
+
+	/** Writes a file into the check's own directory and declares it, as a browser would. */
+	const leavesATrace: CheckDefinition['body'] = async ({ artefactDir, attach }) => {
+		const dir = artefactDir()
+		assert.ok(dir, 'a run keeping evidence must offer a directory')
+		const path = join(dir, 'trace.zip')
+		writeFileSync(path, Buffer.alloc(64))
+		attach('trace', path)
+	}
+
+	it('carries it on the observation when the check failed', async () => {
+		const { environment } = withStore()
+		const observation = await runCheck(
+			check(async context => {
+				await leavesATrace(context)
+				throw new AssertionFailure('the total was wrong')
+			}),
+			environment,
+		)
+
+		assert.equal(observation.verdict, 'fail')
+		assert.deepEqual(
+			observation.artefacts.map(artefact => artefact.kind),
+			['trace'],
+		)
+	})
+
+	it('takes the whole directory back when the check passed', async () => {
+		// The store's own unit tests passed while nothing called discard: a check
+		// that needs no explaining was still leaving a directory per run.
+		const { root, environment } = withStore()
+		const observation = await runCheck(check(leavesATrace), environment)
+
+		assert.equal(observation.verdict, 'pass')
+		assert.deepEqual(observation.artefacts, [])
+		assert.equal(existsSync(join(root, 'artefacts', 't.one')), false)
+	})
+
+	it('offers no directory to a run that keeps no evidence', async () => {
+		let offered: string | undefined = 'something'
+		await runCheck(
+			check(async ({ artefactDir }) => {
+				offered = artefactDir()
+			}),
+			environmentWith(),
+		)
+
+		assert.equal(offered, undefined)
 	})
 })
