@@ -1,3 +1,4 @@
+import type { Artefact } from './artefacts.js'
 import { requiresReason, type Verdict } from './verdict.js'
 
 /** A number a check measured, carried alongside its verdict. */
@@ -40,17 +41,20 @@ export interface Observation {
 	readonly evidence: readonly Evidence[]
 	readonly measurements: readonly Measurement[]
 	readonly attempts: readonly Attempt[]
+	/** Files this check left behind, so a failure can be read rather than guessed at. */
+	readonly artefacts: readonly Artefact[]
 	readonly durationMs: number
 	readonly startedAt: string
 }
 
 export interface ObservationInput extends Omit<
 	Observation,
-	'evidence' | 'measurements' | 'attempts'
+	'evidence' | 'measurements' | 'attempts' | 'artefacts'
 > {
 	readonly evidence?: readonly Evidence[]
 	readonly measurements?: readonly Measurement[]
 	readonly attempts?: readonly Attempt[]
+	readonly artefacts?: readonly Artefact[]
 }
 
 /**
@@ -67,6 +71,7 @@ export const observe = (input: ObservationInput): Observation => {
 		evidence: input.evidence ?? [],
 		measurements: input.measurements ?? [],
 		attempts: input.attempts ?? [],
+		artefacts: input.artefacts ?? [],
 	}
 }
 

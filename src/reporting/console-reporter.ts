@@ -27,6 +27,9 @@ const COLOUR: Readonly<Record<Verdict, string>> = {
 
 const ESC = String.fromCharCode(27)
 
+/** The directory an artefact sits in, for a line that points somewhere. */
+const dirOf = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1)
+
 const lastFailureClass = (observation: Observation): string | undefined =>
 	observation.attempts.at(-1)?.failureClass
 
@@ -113,6 +116,15 @@ export const reportToConsole = (
 		if (first.reason !== undefined) write(`        ${first.reason}`)
 		for (const evidence of first.evidence) {
 			write(`        ${evidence.label}: ${evidence.detail}`)
+		}
+		// Named on the line that failed, not left for somebody to find: on a remote
+		// runner the files are all anyone will ever get.
+		if (first.artefacts.length > 0) {
+			const total = first.artefacts.reduce((sum, artefact) => sum + artefact.bytes, 0)
+			const kinds = first.artefacts.map(artefact => artefact.kind).join(', ')
+			write(
+				`        evidence: ${kinds} (${Math.round(total / 1024)}KB) in ${dirOf(first.artefacts[0]!.path)}`,
+			)
 		}
 		if (group.length > 1) {
 			const why =

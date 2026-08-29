@@ -5,6 +5,7 @@ import { buildMatrix, type Area } from '../kernel/areas.js'
 import type { DriftRecorder } from '../history/drift.js'
 import { judgeDrift, loadDrift, recordDrift, saveDrift } from '../history/drift.js'
 import { candidates, loadFlakes, recordOutcomes, saveFlakes } from '../history/flake.js'
+import { ArtefactStore } from '../kernel/artefacts.js'
 import { Journal } from '../kernel/journal.js'
 import type { Observation } from '../kernel/observation.js'
 import { Quarantine } from '../history/quarantine.js'
@@ -76,8 +77,12 @@ export const execute = async (
 	journal.append({ kind: 'run-started', run })
 
 	const quarantinePath = join(harness.workspace.ledger, 'quarantine.json')
+	// Evidence lands beside the run's own journal, and the budget is the run's
+	// rather than the check's: no single check can see the total, and a suite
+	// failing everywhere is exactly when the files are largest.
 	const environment = defaultEnvironment(run, capabilities, {
 		quarantine: Quarantine.load(quarantinePath),
+		artefacts: new ArtefactStore(join(harness.workspace.results, run.id)),
 	})
 
 	const raw: Observation[] = []

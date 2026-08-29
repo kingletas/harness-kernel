@@ -1,3 +1,4 @@
+import type { Artefact, ArtefactStore } from './artefacts.js'
 import { missingCapabilities, type Capabilities, type CapabilityName } from './capabilities.js'
 import { CircuitBreaker, type CircuitToken } from './circuit.js'
 import { classify, describe, UnsupportedCapability } from './failure.js'
@@ -12,6 +13,7 @@ import { Quarantine } from '../history/quarantine.js'
 import { DEFAULT_RETRY_POLICY, type RetryPolicy } from './retry.js'
 import type { RunIdentity } from './run.js'
 import { deriveRng, type Rng } from './seed.js'
+import type { Verdict } from './verdict.js'
 
 /** What a check body is handed. */
 export interface CheckContext {
@@ -22,6 +24,13 @@ export interface CheckContext {
 	readonly record: (label: string, detail: string) => void
 	/** A number to carry alongside the verdict, for baselines and reports. */
 	readonly measure: (measurement: Measurement) => void
+	/**
+	 * A directory this check may leave evidence in, created on first use, or
+	 * undefined when the run is not keeping any.
+	 */
+	readonly artefactDir: () => string | undefined
+	/** Declares a file written into that directory, to be attached to the observation. */
+	readonly attach: (kind: string, absolutePath: string) => void
 }
 
 export interface CheckDefinition {
@@ -48,6 +57,8 @@ export interface CheckEnvironment {
 	readonly retry: RetryPolicy
 	readonly now: () => Date
 	readonly sleep: (ms: number) => Promise<void>
+	/** Where evidence goes and what the run may spend on it. Absent means keep none. */
+	readonly artefacts?: ArtefactStore
 }
 
 export const defaultEnvironment = (
@@ -107,12 +118,22 @@ export const runCheck = async (
 		})
 	}
 
+	const store = environment.artefacts
 	const context: CheckContext = {
 		run,
 		rng: deriveRng(run.seed, definition.id),
 		record: (label, detail) => evidence.push({ label, detail }),
 		measure: measurement => measurements.push(measurement),
+		artefactDir: () => (store?.accepting === true ? store.dirFor(definition.id) : undefined),
+		attach: (kind, absolutePath) => store?.claim(definition.id, kind, absolutePath),
 	}
+
+	/**
+	 * Evidence is kept only where the verdict needs explaining. A passing check
+	 * that left a trace behind is a disk filling up for nothing.
+	 */
+	const collect = (verdict: Verdict): { artefacts: readonly Artefact[]; dropped?: string } =>
+		store === undefined || verdict === 'pass' ? { artefacts: [] } : store.collect(definition.id)
 
 	const policy = definition.retry ?? environment.retry
 	const attempts: Attempt[] = []
@@ -150,6 +171,9 @@ export const runCheck = async (
 					? `quarantined until ${held.until} — ${held.reason}; passed on attempt ${attemptNumber} of ${allowed}`
 					: `passed on attempt ${attemptNumber} of ${allowed}`
 
+			const kept = collect(verdict)
+			if (kept.dropped !== undefined) evidence.push({ label: 'evidence', detail: kept.dropped })
+
 			return observe({
 				...base,
 				verdict,
@@ -157,6 +181,7 @@ export const runCheck = async (
 				evidence,
 				measurements,
 				attempts,
+				artefacts: kept.artefacts,
 				durationMs: now().getTime() - startedAt.getTime(),
 			})
 		} catch (error) {
@@ -185,6 +210,9 @@ export const runCheck = async (
 					? `quarantined until ${held.until} — ${held.reason}; this run: ${describe(error)}`
 					: `${failure}: ${describe(error)}`
 
+			const kept = collect(verdict)
+			if (kept.dropped !== undefined) evidence.push({ label: 'evidence', detail: kept.dropped })
+
 			return observe({
 				...base,
 				verdict,
@@ -192,6 +220,7 @@ export const runCheck = async (
 				evidence,
 				measurements,
 				attempts,
+				artefacts: kept.artefacts,
 				durationMs: now().getTime() - startedAt.getTime(),
 			})
 		}
