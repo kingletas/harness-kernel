@@ -31,14 +31,23 @@ export const selectionFor = async (
 	const repoDir = target.repoDir
 	const rules = target.impact?.()
 	if (repoDir === undefined || rules === undefined) {
+		// Naming which half is missing, because they are fixed by different people:
+		// an absent impact map is the target author's, an absent checkout is the
+		// operator's, and one message for both sends each of them the wrong way.
+		const missing =
+			rules === undefined
+				? repoDir === undefined
+					? 'no impact map and no checkout to diff'
+					: 'no impact map'
+				: 'no checkout to diff'
 		process.stderr.write(
-			`${harness.name}: ${target.name} declares no impact map, so --changed cannot narrow it\n`,
+			`${harness.name}: ${target.name} declares ${missing}, so --changed cannot narrow it\n`,
 		)
 		return {
 			areas: [],
 			unmapped: [],
 			runEverything: true,
-			reason: 'the target declares no impact map',
+			reason: `the target declares ${missing}`,
 		}
 	}
 

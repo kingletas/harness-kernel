@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check (Node ${{ matrix.node-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node-version: ['20.x', '22.x', '24.x']
+        include:
+          - os: macos-latest
+            node-version: '22.x'
+          - os: windows-latest
+            node-version: '22.x'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # `npm ci` rather than `npm install`: it installs exactly what the lockfile
+      # says and fails when the lockfile and package.json disagree, so a bump that
+      # was never locked breaks here instead of on a contributor's laptop.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -p .
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Format
+        run: npx prettier --check .
+
+      - name: Unit suite
+        run: node --test dist/tests/
+
+  quiet:
+    name: The kernel is silent when nothing is wrong
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -p .
+
+      # A green suite proves the kernel agrees with itself. It says nothing about
+      # whether a healthy target produces a silent console, which is the contract
+      # the whole package is built on -- so assert on the output, not the exit code.
+      - name: A healthy stub target says nothing
+        run: |
+          set -euo pipefail
+          ./bin/harness-selfcheck selfcheck > selfcheck.out 2>&1
+          if [ -s selfcheck.out ]; then
+            echo "the healthy target produced output; the silence contract is broken"
+            cat selfcheck.out
+            exit 1
+          fi
+
+  loud:
+    name: The alarm fires when something is
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -p .
+
+      # The other half, and the half a passing test suite can never reach: a stub
+      # told to carry a defect must exit non-zero AND name itself. A check that
+      # went quiet on a real defect would leave every gate downstream decorative.
+      - name: A defective stub target exits non-zero and names itself
+        run: ./scripts/prove-alarm.sh

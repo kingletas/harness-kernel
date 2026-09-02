@@ -7,13 +7,29 @@ neither of the two that exist — a CLI, a queue consumer, a mobile app. The tes
 for whether something belongs is exactly that: percentiles belong, add-to-cart
 does not.
 
+## Installing it
+
+Not on npm. Depend on the repository:
+
+```bash
+npm install github:kingletas/harness-kernel
+```
+
+It has **no runtime dependencies** and builds itself on install, so the only thing it brings with it is Node.
+
+## Checking it
+
 ```bash
 make check
 ```
 
+The build, eslint, prettier and the unit suite — what the pre-commit hook runs.
+
 ```bash
 make selfcheck-loud
 ```
+
+The other direction. [Proving it](#proving-it), below, is what that means.
 
 ## What a harness gets
 
@@ -61,3 +77,11 @@ healthy target produces no output at all.
 
 A green run proves nothing about the alarm, and a firing alarm proves nothing
 about the quiet.
+
+## Built on it
+
+- [drexbot](https://github.com/kingletas/drexbot) — regression, acceptance, behaviour and performance testing for a Magento storefront.
+
+## License
+
+MIT — see [LICENSE](LICENSE). [CONTRIBUTING.md](CONTRIBUTING.md) is the shape a change should arrive in, and [SECURITY.md](SECURITY.md) has the model and the reporting route.

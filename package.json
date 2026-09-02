@@ -3,6 +3,25 @@
 	"version": "0.1.0",
 	"description": "A test kernel that knows nothing about any target: the run, the eight verdicts, the ledgers and the reporting",
 	"license": "MIT",
+	"author": "Luis Tineo <code@kingletas.com>",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kingletas/harness-kernel.git"
+	},
+	"bugs": {
+		"url": "https://github.com/kingletas/harness-kernel/issues"
+	},
+	"homepage": "https://github.com/kingletas/harness-kernel#readme",
+	"keywords": [
+		"testing",
+		"test-harness",
+		"acceptance-testing",
+		"regression-testing",
+		"flaky-tests",
+		"quarantine",
+		"verdicts",
+		"test-kernel"
+	],
 	"type": "module",
 	"engines": {
 		"node": ">=20.19.0"
@@ -15,8 +34,10 @@
 	"files": [
 		"dist",
 		"src",
+		"bin",
 		"README.md",
-		"CHANGELOG.md"
+		"CHANGELOG.md",
+		"LICENSE"
 	],
 	"bin": {
 		"harness-selfcheck": "./bin/harness-selfcheck"
