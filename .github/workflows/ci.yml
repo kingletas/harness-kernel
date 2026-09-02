@@ -51,7 +51,7 @@ jobs:
         run: npx prettier --check .
 
       - name: Unit suite
-        run: node --test dist/tests/
+        run: node --test
 
   quiet:
     name: The kernel is silent when nothing is wrong

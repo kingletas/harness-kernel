@@ -46,7 +46,7 @@
 		"build": "tsc -p .",
 		"prepare": "tsc -p .",
 		"typecheck": "tsc --noEmit -p .",
-		"test": "node --test dist/tests/",
+		"test": "node --test",
 		"lint": "eslint .",
 		"format:check": "prettier --check ."
 	},

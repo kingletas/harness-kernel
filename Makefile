@@ -46,7 +46,9 @@ format-check: $(NODE_MODULES) ## Fail when a file is not in house style
 
 .PHONY: test
 test: build ## Unit-test the kernel, under a runner that is not a harness
-	node --test dist/tests/
+	@# Node's own discovery, not a path: passing `dist/tests/` worked on Node 20
+	@# and is read as a module name from 22 onward, which fails before a test runs.
+	node --test
 
 .PHONY: selfcheck
 selfcheck: build ## Prove the kernel end to end against its own stub
