@@ -26,7 +26,9 @@ export const planOnly = async (harness: Harness, options: Options): Promise<numb
 	for (const path of selection.unmapped) process.stdout.write(`  unmapped: ${path}\n`)
 	process.stdout.write(
 		`\n  would run ${chosen.length} of ${checks.length} checks` +
-			`${selection.runEverything ? ' — everything, because the map is incomplete' : ''}\n\n`,
+			// The reason is printed above; naming a second one here asserted the
+			// map was incomplete even when the missing piece was the checkout.
+			`${selection.runEverything ? ' — everything' : ''}\n\n`,
 	)
 
 	return 0
