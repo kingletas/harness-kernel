@@ -28,6 +28,21 @@ describe('ArtefactStore', () => {
 		assert.equal(artefacts[0]?.path, 'artefacts/a.check/trace.zip')
 	})
 
+	it('separates a reported path with / on whichever platform wrote it', () => {
+		// A report is read somewhere other than where it was written, so a Windows
+		// separator would not survive the trip. Only the Windows leg can fail this.
+		const kept = store()
+		const dir = kept.dirFor('a.check')
+		kept.claim('a.check', 'trace', write(dir, 'trace.zip', 10))
+
+		const { artefacts } = kept.collect('a.check')
+
+		assert.ok(
+			!artefacts[0]?.path.includes('\\'),
+			`a reported path must carry no backslash, got ${artefacts[0]?.path}`,
+		)
+	})
+
 	it('drops a claim on a file that was never written', () => {
 		// A producer that decided the run was healthy and discarded its recording
 		// must not leave a report pointing at nothing.

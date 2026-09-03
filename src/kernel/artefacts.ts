@@ -1,5 +1,12 @@
 import { existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
+
+/**
+ * A path for the report, always separated by `/`. A report is read on a machine
+ * that is not the one that wrote it, so a Windows separator would not survive.
+ */
+const reportPath = (root: string, absolute: string): string =>
+	relative(root, absolute).split(sep).join('/')
 
 /** A file a check produced that helps explain its verdict. */
 export interface Artefact {
@@ -78,7 +85,7 @@ export class ArtefactStore {
 			}
 
 			this.spent += bytes
-			artefacts.push({ kind, path: relative(this.root, absolute), bytes })
+			artefacts.push({ kind, path: reportPath(this.root, absolute), bytes })
 		}
 
 		// A directory that kept nothing is litter, and a tree of them reads as
