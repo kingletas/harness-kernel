@@ -1,6 +1,6 @@
 {
-	"name": "@harness/kernel",
-	"version": "0.1.0",
+	"name": "harness-kernel",
+	"version": "0.2.0",
 	"description": "A test kernel that knows nothing about any target: the run, the eight verdicts, the ledgers and the reporting",
 	"license": "MIT",
 	"author": "Luis Tineo <code@kingletas.com>",

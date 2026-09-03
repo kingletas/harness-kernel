@@ -1,4 +1,4 @@
-# @harness/kernel
+# harness-kernel
 
 A test kernel that knows nothing about any target.
 

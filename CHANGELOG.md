@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+**Renamed from `@harness/kernel` to `harness-kernel`.** The old name sat in a
+scope nobody here owns, so it could never be published — and npm 12 declines
+git dependencies by default, which is what a consumer was left with. Update the
+dependency name; nothing else about the API moved.
+
 ## 0.1.0
 
 The first release, and the first one anybody else can install.
