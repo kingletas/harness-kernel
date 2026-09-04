@@ -22,7 +22,7 @@ export const quarantineCommand = (harness: Harness, argv: readonly string[]): nu
 
 		if (id === undefined || reason === undefined || !Number.isFinite(days) || days <= 0) {
 			process.stderr.write(
-				'usage: houndbot quarantine add <check-id> --reason "why" [--days 14]\n' +
+				`usage: ${harness.name} quarantine add <check-id> --reason "why" [--days 14]\n` +
 					'  A reason and an expiry are both required. An entry that never expires\n' +
 					'  turns the list into a graveyard of checks nobody has to fix.\n',
 			)

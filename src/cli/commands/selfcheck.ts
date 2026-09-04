@@ -20,7 +20,12 @@ export const selfcheck = async (harness: Harness, options: Options): Promise<num
 			stub.build,
 		)
 
-		return await execute(harness, run, selfcheckChecks(stub.url), NO_CAPABILITIES, options)
+		// Never notifies, whatever the environment asks for. The stub is told what
+		// to be, so every defect it carries is one this command chose to inject.
+		return await execute(harness, run, selfcheckChecks(stub.url), NO_CAPABILITIES, {
+			...options,
+			notify: options.notify === 'on' ? 'on' : 'off',
+		})
 	} finally {
 		await stub.close()
 	}

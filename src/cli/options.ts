@@ -24,6 +24,7 @@ Usage:
   ${harness.name} quarantine [add <id>]      List what is held out, and what is asking to be
   ${harness.name} flakes [--target <name>]   Checks whose recent history is inconsistent
   ${harness.name} flakes --forget <id>       Drop one check's history from the ledger
+  ${harness.name} notify --test              Send one message to prove the channel works
   ${harness.name} help
 ${Object.values(extras)
 	.map(extra => `  ${harness.name} ${extra.usage}`)
@@ -44,6 +45,10 @@ Options:
                     drift ledger and no flake ledger. Said out loud in the run's
                     own output, so a teaching run and a non-teaching one can
                     never be confused for each other
+  --no-notify       Tell nobody about this run, whatever HARNESS_NOTIFY says.
+                    Implied by --no-record
+  --notify          Tell the channel even from a command that would not, which
+                    is how the selfcheck is used to prove the channel at all
   --matrix          Print the sign-off sheet after the run
   --changed         Run only what a diff in the target's repository put at risk
   --since <ref>     What to diff against (default HEAD, i.e. uncommitted work)
@@ -51,10 +56,18 @@ Options:
   --defect <name>   selfcheck only: none, session-less-read, intermittent,
                     slow, refuses-connections
 
+Environment:
+  HARNESS_NOTIFY            none (default), mail or webhook
+  HARNESS_NOTIFY_SMTP       mail: host:port of the sink
+  HARNESS_NOTIFY_TO         mail: who is told
+  HARNESS_NOTIFY_FROM       mail: who it claims to be from. Default harness@localhost
+  HARNESS_NOTIFY_WEBHOOK    webhook: the incoming-webhook URL
+
 Exit codes:
   0  nothing red
   1  a check failed, or the target could not be reached
   2  the command or its arguments were wrong
+  3  the run finished and the channel could not be told; the verdict is above
 `
 
 export interface Options {
@@ -68,6 +81,8 @@ export interface Options {
 	readonly verbose: boolean
 	/** Whether this run is allowed to leave anything behind for a later run to read. */
 	readonly record: boolean
+	/** Whether this run may tell the channel about itself; `on` overrides a command that would not. */
+	readonly notify: 'auto' | 'on' | 'off'
 	readonly degradedIsRed: boolean
 	readonly matrix: boolean
 	/** Narrow the run to what a diff in the target's repository put at risk. */
@@ -93,6 +108,13 @@ export const parse = (argv: readonly string[]): Options => {
 		workers: Number(valueAfter('--workers') ?? '1'),
 		verbose: argv.includes('--verbose'),
 		record: !argv.includes('--no-record'),
+		// A run that teaches nothing tells nobody either: an arranged experiment
+		// that pages a person is indistinguishable from a real failure.
+		notify: argv.includes('--notify')
+			? 'on'
+			: argv.includes('--no-notify') || argv.includes('--no-record')
+				? 'off'
+				: 'auto',
 		degradedIsRed: argv.includes('--strict'),
 		matrix: argv.includes('--matrix'),
 		changed: argv.includes('--changed'),

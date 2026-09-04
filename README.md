@@ -46,6 +46,9 @@ The other direction. [Proving it](#proving-it), below, is what that means.
   them.
 - **A console that says nothing** when the run is green and its known exceptions
   are unchanged.
+- **A channel that says nothing either** — mail or an incoming webhook, carrying
+  the console's own text, backing off a story it has already told and refusing
+  to call a recovery until it has held.
 
 ## What a harness must provide
 
@@ -66,6 +69,26 @@ process.exitCode = await runCli(harness, process.argv.slice(2))
 `runCli` brings `run`, `selfcheck`, `targets`, `coverage`, `plan`, `probe`,
 `quarantine` and `flakes`. A tool adds its own with the third argument rather
 than by editing a switch.
+
+## Telling somebody
+
+A scheduled run nobody reads is worse than no run, so the kernel can hand a run
+to a channel. It is off unless the environment asks for it:
+
+```bash
+HARNESS_NOTIFY=mail HARNESS_NOTIFY_SMTP=127.0.0.1:1025 HARNESS_NOTIFY_TO=you@example.test
+HARNESS_NOTIFY=webhook HARNESS_NOTIFY_WEBHOOK=https://chat.example/hooks/...
+```
+
+`notify --test` sends one message and names where it went. A channel described
+wrongly is refused before the first check runs, and a message that could not be
+delivered exits **3** and records nothing as sent, so the next run says it again.
+
+The channel is quiet in exactly the cases the console is: a green run whose story
+is unchanged reaches nobody. A failure that persists is repeated after 2 runs,
+then 4, 8, 16 and 32 — held per story, so two failures taking turns do not reset
+each other's schedule — and a recovery is announced only once it has held for two
+runs.
 
 ## Proving it
 

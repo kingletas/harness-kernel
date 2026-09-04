@@ -6,6 +6,7 @@ import { probeTarget } from './commands/probe.js'
 import { quarantineCommand } from './commands/quarantine.js'
 import { runAgainstTarget } from './commands/run.js'
 import { selfcheck } from './commands/selfcheck.js'
+import { testChannel } from './commands/notify.js'
 import { listTargets } from './commands/targets.js'
 import type { Harness } from './harness.js'
 
@@ -58,6 +59,13 @@ export const runCli = async (
 			return probeTarget(harness, parse(rest))
 		case 'quarantine':
 			return quarantineCommand(harness, rest)
+		case 'notify': {
+			if (!rest.includes('--test')) {
+				process.stderr.write(`usage: ${harness.name} notify --test\n`)
+				return 2
+			}
+			return testChannel(harness)
+		}
 		case 'flakes': {
 			const forget = rest.indexOf('--forget')
 			const id = forget === -1 ? undefined : rest[forget + 1]

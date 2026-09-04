@@ -62,6 +62,7 @@ ledger_files=(
 	baselines/stub--local--selfcheck.signature
 	baselines/stub--local--selfcheck.measurements.json
 	ledger/stub.flake.json
+	baselines/stub--local--selfcheck.notify.json
 )
 
 fingerprint() {
@@ -196,6 +197,54 @@ if [[ "$(measurements)" != "$before" ]]; then
 	ok "a narrow run does move it, so the check above has content"
 else
 	bad "a narrow run moved nothing — the width check proves nothing"
+fi
+
+# --- somebody is told ---
+#
+# The channel has the same two directions as everything else here. The selfcheck
+# tells nobody unless --notify is passed, because the stub is told what to be and
+# an arranged defect must never reach a person who did not arrange it.
+
+# A channel described wrongly is refused before a single check runs, which is
+# what stops a typo costing a suite to discover.
+started=$SECONDS
+misconfigured=$(HARNESS_NOTIFY=mail HARNESS_NOTIFY_SMTP=127.0.0.1:1 \
+	./bin/harness-selfcheck selfcheck --notify --no-record 2>&1)
+status=$?
+if [[ $status -eq 2 ]] && grep -q 'HARNESS_NOTIFY_TO is not set' <<<"$misconfigured" &&
+	[[ $((SECONDS - started)) -lt 5 ]]; then
+	ok "a half-described channel is refused in seconds, before the suite runs"
+else
+	bad "a half-described channel exited ${status} after $((SECONDS - started))s"
+fi
+
+# A channel that cannot be reached is loud and exits 3. Nobody was told, so the
+# run must not be able to say 0 and must not record the story as delivered.
+undelivered=$(HARNESS_NOTIFY=mail HARNESS_NOTIFY_SMTP=127.0.0.1:1 HARNESS_NOTIFY_TO=nobody@localhost \
+	./bin/harness-selfcheck selfcheck --defect session-less-read --notify --no-record 2>&1)
+status=$?
+if [[ $status -eq 3 ]] && grep -q 'could not be told' <<<"$undelivered"; then
+	ok "a channel that refuses the message exits 3 and says so"
+else
+	bad "an undelivered alert exited ${status}"
+fi
+
+if [[ ! -f baselines/stub--local--selfcheck.notify.json ]]; then
+	ok "a run that told nobody recorded nothing as sent"
+else
+	bad "an undelivered alert wrote notification state"
+fi
+
+# The quiet direction, and the one that matters most: a green run with a channel
+# configured must still say nothing to anybody.
+./bin/harness-selfcheck selfcheck --notify >/dev/null 2>&1
+quiet=$(HARNESS_NOTIFY=mail HARNESS_NOTIFY_SMTP=127.0.0.1:1 HARNESS_NOTIFY_TO=nobody@localhost \
+	./bin/harness-selfcheck selfcheck --notify 2>&1)
+status=$?
+if [[ $status -eq 0 ]]; then
+	ok "a healthy run never reaches the channel, so it cannot fail to deliver"
+else
+	bad "a healthy run tried to tell somebody and exited ${status}: ${quiet}"
 fi
 
 echo

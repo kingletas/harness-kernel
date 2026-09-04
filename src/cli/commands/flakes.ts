@@ -43,7 +43,7 @@ export const forgetFlakes = (harness: Harness, id: string, only: string | undefi
 	if (forgotten === 0) {
 		process.stderr.write(
 			`${harness.name}: no ledger holds a history for "${id}"${only === undefined ? '' : ` under ${only}`}\n` +
-				'  houndbot flakes lists what is inconsistent; the ledger holds every check that has ever run\n',
+				`  ${harness.name} flakes lists what is inconsistent; the ledger holds every check that has ever run\n`,
 		)
 		return 2
 	}

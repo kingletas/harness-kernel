@@ -69,6 +69,8 @@ const collapse = (observations: readonly Observation[]): Observation[][] => {
 }
 
 export interface ConsoleOptions {
+	/** The tool's own name, so a report never tells a reader to run another tool. */
+	readonly name?: string
 	/** Off when stdout is not a terminal, so a captured log stays readable. */
 	readonly colour?: boolean
 	/** Report every observation rather than only what changed. */
@@ -94,7 +96,7 @@ export const reportToConsole = (
 	if (!summary.red && !summary.changed && !options.verbose) return
 
 	write('')
-	write(`houndbot ${run.target}/${run.environment} — ${run.suites.join(', ')}`)
+	write(`${options.name ?? 'harness'} ${run.target}/${run.environment} — ${run.suites.join(', ')}`)
 	write(`  run ${run.id}   seed ${run.seed}   build ${run.build}`)
 	write('')
 

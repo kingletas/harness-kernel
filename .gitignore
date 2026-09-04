@@ -20,6 +20,11 @@ results/
 # a CI runner's numbers reports a regression that is only a change of hardware.
 /baselines/*.measurements.json
 
+# Nor is the notification state, for the same reason: it records who has been
+# told what on this machine, and a committed copy would make one person's
+# channel decide whether another person's run says anything.
+/baselines/*.notify.json
+
 # The selfcheck stub's own history is NOT committed, and the two target ledgers
 # are. The stub is told what to be — every entry in its history comes from
 # somebody running `make check` or `make selfcheck-loud` on their own machine,

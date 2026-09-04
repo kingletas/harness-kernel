@@ -18,6 +18,7 @@ import {
 	saveBaseline,
 } from '../history/measurements.js'
 import { reportToConsole } from '../reporting/console-reporter.js'
+import { channelFromEnvironment, ChannelMisconfigured, notify } from '../reporting/notify.js'
 import { renderMatrix, writeMatrix } from '../reporting/matrix-reporter.js'
 import { writeJsonReport } from '../reporting/json-reporter.js'
 import { readSignature, writeSignature } from '../history/signature.js'
@@ -35,6 +36,7 @@ export const spared = (hasSelectors: boolean): string => {
 		'the measurement baseline',
 		...(hasSelectors ? ['the selector drift ledger'] : []),
 		'the flake ledger',
+		'the notification state',
 	]
 	return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }
@@ -53,6 +55,18 @@ export const execute = async (
 	recorder?: DriftRecorder,
 	areas: readonly Area[] = [],
 ): Promise<number> => {
+	// Resolved before a single check runs. A channel described wrongly is found in
+	// a second rather than after a suite, and asking to be told and not being told
+	// is the one outcome this whole path exists to make impossible.
+	let channel
+	try {
+		channel = options.notify === 'off' ? undefined : channelFromEnvironment()
+	} catch (cause) {
+		if (!(cause instanceof ChannelMisconfigured)) throw cause
+		process.stderr.write(`\n  ${harness.name}: ${cause.message}\n`)
+		return 2
+	}
+
 	// Said out loud green or not, like a narrowed run: an experiment and a real
 	// run must never produce output a person could mistake for each other.
 	if (!options.record) {
@@ -119,7 +133,7 @@ export const execute = async (
 	const policy = { degradedIsRed: options.degradedIsRed }
 	const summary = summarize(observations, readSignature(`${stem}.signature`), policy)
 
-	reportToConsole(run, observations, summary, { verbose: options.verbose })
+	reportToConsole(run, observations, summary, { name: harness.name, verbose: options.verbose })
 	writeJsonReport(
 		join(harness.workspace.results, run.id, 'report.json'),
 		run,
@@ -151,8 +165,8 @@ export const execute = async (
 			process.stdout.write(
 				`\n  ${candidate.id} has not passed ${candidate.failures} of its last ${candidate.runs} runs ` +
 					`(${Math.round(candidate.rate * 100)}%)${candidate.rescuedByRetry ? ', and a retry has rescued it' : ''}.\n` +
-					`  Fix it, or quarantine it: houndbot quarantine add ${candidate.id} --reason "..." --days 14\n` +
-					`  History that should not have been kept: houndbot flakes --forget ${candidate.id}\n`,
+					`  Fix it, or quarantine it: ${harness.name} quarantine add ${candidate.id} --reason "..." --days 14\n` +
+					`  History that should not have been kept: ${harness.name} flakes --forget ${candidate.id}\n`,
 			)
 		}
 	}
@@ -169,6 +183,29 @@ export const execute = async (
 			saveBaseline(`${stem}.measurements.json`, recordMeasurements(observations, measurements))
 		}
 		if (recorder !== undefined) saveDrift(driftPath, recordDrift(recorder, drift))
+	}
+
+	// Last, so nobody is told about a run whose ledgers have not settled, and
+	// after the console so the two can never disagree about one run.
+	if (channel !== undefined) {
+		const outcome = await notify({
+			channel,
+			statePath: `${stem}.notify.json`,
+			name: harness.name,
+			run,
+			observations,
+			summary,
+			remember: options.record,
+		})
+
+		if (outcome.failure !== undefined) {
+			process.stderr.write(
+				`\n  ${harness.name}: ${channel.name} (${channel.where}) could not be told — ${outcome.failure}\n` +
+					'  Nothing was recorded as sent, so the next run says this again.\n',
+			)
+			return 3
+		}
+		if (outcome.told) process.stdout.write(`  told ${channel.name}: ${channel.where}\n\n`)
 	}
 
 	return summary.red ? 1 : 0
