@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.0
+
+**One run at a time per target.** A lock is taken before the first check and
+released in a `finally`; a second run against the same target and environment
+names the holder and does nothing rather than writing the same ledgers twice.
+The lock is created with `O_EXCL` rather than checked and then written, because
+the check-then-create version lets two runs through the same gap.
+
+**A lock nobody is holding never blocks anything.** One left by a process that
+is gone is taken over and said so; one written by a run killed halfway, naming
+nobody, is taken over too. A lock held on another host is never reclaimed —
+nothing here can tell whether that process is alive.
+
+**`schedule plan` and `schedule install`** write a systemd user service and
+timer with `Persistent=true`, so a window missed while the machine was off runs
+once it comes back. **Neither enables anything**: install writes the files and
+prints the three commands that turn them into a schedule. The channel's
+variables are read from an `EnvironmentFile` rather than written into the unit,
+because a webhook URL carries its token and a unit file is readable by anyone
+on the machine. Linux only, and it says so rather than writing something inert.
+
+**`schedule report`** is the weekly read: runs, how many were red, how long ago
+the last one was, **the longest stretch with no run at all** — which is how a
+timer that stopped firing shows up — and the checks that actually went wrong.
+`unsupported` and `quarantined` are left out; either would head that list for
+ever with nothing anybody could do about it.
+
+**A closed pipe is no longer a crash.** `schedule report | head` ended in an
+unhandled `EPIPE` and a stack trace where the output should have been.
+
 ## 0.3.0
 
 **A channel, so a run nobody is watching can still tell somebody.** `HARNESS_NOTIFY`

@@ -247,6 +247,50 @@ else
 	bad "a healthy run tried to tell somebody and exited ${status}: ${quiet}"
 fi
 
+# --- one run at a time per target ---
+#
+# A schedule firing while the last run is still going would have two suites
+# writing one set of ledgers. Both directions matter: a live holder must stop a
+# run, and a holder that is gone must never stop one for ever.
+
+lock=results/.locks/stub--local.lock
+mkdir -p results/.locks
+rm -f "$lock"
+
+# A holder that is alive: this shell, which is by definition running.
+printf '{"pid": %d, "host": "%s", "runId": "made-up", "since": "%s"}\n' \
+	"$$" "$(hostname)" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >"$lock"
+busy=$(./bin/harness-selfcheck selfcheck --no-record 2>&1)
+status=$?
+if [[ $status -eq 0 ]] && grep -q 'already in flight' <<<"$busy" && grep -q 'made-up' <<<"$busy"; then
+	ok "a second run against a busy target does nothing and names the holder"
+else
+	bad "a second run exited ${status}: ${busy}"
+fi
+
+if [[ -f $lock ]] && grep -q 'made-up' "$lock"; then
+	ok "and it left the holder's lock alone"
+else
+	bad "a refused run deleted a lock it did not hold"
+fi
+
+# A holder that is gone. PID 2^22 is above every pid_max in use and owns nothing.
+printf '{"pid": 4194303, "host": "%s", "runId": "crashed", "since": "%s"}\n' \
+	"$(hostname)" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >"$lock"
+taken=$(./bin/harness-selfcheck selfcheck --no-record 2>&1)
+if grep -q 'took over a lock left by run crashed' <<<"$taken"; then
+	ok "a lock whose process is gone is taken over rather than obeyed for ever"
+else
+	bad "a dead holder's lock stopped the run: ${taken}"
+fi
+
+if [[ ! -f $lock ]]; then
+	ok "a finished run leaves no lock behind"
+else
+	bad "the run kept its lock after finishing"
+	rm -f "$lock"
+fi
+
 echo
 [[ $fails -eq 0 ]] || { echo "  ${fails} direction(s) misbehaved"; exit 1; }
 echo "  every direction behaved"

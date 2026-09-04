@@ -19,6 +19,7 @@ import {
 } from '../history/measurements.js'
 import { reportToConsole } from '../reporting/console-reporter.js'
 import { channelFromEnvironment, ChannelMisconfigured, notify } from '../reporting/notify.js'
+import { acquireLock, STUCK_AFTER_MS } from '../kernel/lock.js'
 import { renderMatrix, writeMatrix } from '../reporting/matrix-reporter.js'
 import { writeJsonReport } from '../reporting/json-reporter.js'
 import { readSignature, writeSignature } from '../history/signature.js'
@@ -87,126 +88,160 @@ export const execute = async (
 		)
 	}
 
-	const journal = Journal.at(join(harness.workspace.results, run.id, 'journal.jsonl'))
-	journal.append({ kind: 'run-started', run })
-
-	const quarantinePath = join(harness.workspace.ledger, 'quarantine.json')
-	// Evidence lands beside the run's own journal, and the budget is the run's
-	// rather than the check's: no single check can see the total, and a suite
-	// failing everywhere is exactly when the files are largest.
-	const environment = defaultEnvironment(run, capabilities, {
-		quarantine: Quarantine.load(quarantinePath),
-		artefacts: new ArtefactStore(join(harness.workspace.results, run.id)),
-	})
-
-	const raw: Observation[] = []
-	if (preflight !== undefined) {
-		raw.push(preflight)
-		journal.append({ kind: 'observation', observation: preflight })
-	}
-
-	if (preflight?.verdict !== 'blocked') {
-		raw.push(...(await runChecks(checks, environment, { journal, concurrency: options.workers })))
-	}
-
-	const scope = [...run.suites].sort().join('+')
-	const stem = join(harness.workspace.baselines, `${run.target}--${run.environment}--${scope}`)
-	const measurements = loadBaseline(`${stem}.measurements.json`)
-
-	// Judged after the checks have all run, so a slow measurement is a verdict on
-	// an observation that otherwise passed rather than something a check body has
-	// to know how to decide for itself.
-	const driftPath = join(harness.workspace.ledger, `${run.target}.drift.json`)
-	const drift = loadDrift(driftPath)
-
-	const alone = options.workers === 1
-	const observations = [
-		...(alone ? judgeMeasurements(raw, measurements) : raw),
-		...(recorder === undefined
-			? []
-			: judgeDrift(recorder, drift, {
-					target: run.target,
-					runId: run.id,
-					startedAt: run.startedAt,
-				})),
-	]
-	const policy = { degradedIsRed: options.degradedIsRed }
-	const summary = summarize(observations, readSignature(`${stem}.signature`), policy)
-
-	reportToConsole(run, observations, summary, { name: harness.name, verbose: options.verbose })
-	writeJsonReport(
-		join(harness.workspace.results, run.id, 'report.json'),
-		run,
-		observations,
-		summary,
+	// One run at a time per target. A schedule firing while the last run is still
+	// going would have two suites writing one set of ledgers, and the second one
+	// would judge measurements taken while the first was loading the target.
+	const lock = acquireLock(
+		join(harness.workspace.locks, `${run.target}--${run.environment}.lock`),
+		{
+			runId: run.id,
+		},
 	)
 
-	if (areas.length > 0) {
-		// Written every run and printed only when asked: a sign-off sheet is an
-		// artefact somebody reads deliberately, and a wall of green after every
-		// run is what the silence contract exists to prevent.
-		const rows = buildMatrix(areas, observations)
-		writeMatrix(join(harness.workspace.results, run.id, 'matrix'), run, rows)
-		if (options.matrix) renderMatrix(rows, line => process.stdout.write(`${line}\n`))
-	}
-	journal.append({ kind: 'run-finished', at: new Date().toISOString(), red: summary.red })
-
-	// Recorded whatever the run did, unlike the baselines below: a failure is the
-	// observation being counted here. The proposal is suppressed with the ledger
-	// rather than kept, since the history behind it would not be there.
-	if (options.record) {
-		const flakePath = join(harness.workspace.ledger, `${run.target}.flake.json`)
-		const before = new Set(candidates(loadFlakes(flakePath)).map(candidate => candidate.id))
-		const flakes = recordOutcomes(observations, loadFlakes(flakePath))
-		saveFlakes(flakePath, flakes)
-
-		const fresh = candidates(flakes).filter(candidate => !before.has(candidate.id))
-		for (const candidate of fresh) {
-			process.stdout.write(
-				`\n  ${candidate.id} has not passed ${candidate.failures} of its last ${candidate.runs} runs ` +
-					`(${Math.round(candidate.rate * 100)}%)${candidate.rescuedByRetry ? ', and a retry has rescued it' : ''}.\n` +
-					`  Fix it, or quarantine it: ${harness.name} quarantine add ${candidate.id} --reason "..." --days 14\n` +
-					`  History that should not have been kept: ${harness.name} flakes --forget ${candidate.id}\n`,
+	if (!lock.held) {
+		process.stdout.write(
+			`  ${harness.name}: a run against ${run.target}/${run.environment} is already in flight ` +
+				`(run ${lock.holder.runId}, pid ${lock.holder.pid} on ${lock.holder.host}) — this one did nothing\n`,
+		)
+		if (lock.ageMs > STUCK_AFTER_MS) {
+			process.stderr.write(
+				`  it has held the lock for ${Math.round(lock.ageMs / 60_000)} minutes, which no suite here takes.\n` +
+					`  Nothing will run against this target until that process ends.\n`,
 			)
 		}
+		return 0
 	}
 
-	// Neither history moves on a red run. Recording a failure as the new normal is
-	// how a suite talks itself into silence about it, and recording a broken run's
-	// timings teaches the baseline to accept the breakage.
-	if (options.record && !summary.red) {
-		writeSignature(`${stem}.signature`, summary.signature)
-		// Only a run that had the target to itself contributes a timing. Folding
-		// in a number measured while the harness was loading the target teaches
-		// the baseline to accept slowness, which is the alarm turning itself off.
-		if (alone) {
-			saveBaseline(`${stem}.measurements.json`, recordMeasurements(observations, measurements))
+	if (lock.reclaimed !== undefined) {
+		process.stdout.write(
+			`  ${harness.name}: took over a lock left by run ${lock.reclaimed.runId}, whose process is gone\n`,
+		)
+	}
+
+	try {
+		const journal = Journal.at(join(harness.workspace.results, run.id, 'journal.jsonl'))
+		journal.append({ kind: 'run-started', run })
+
+		const quarantinePath = join(harness.workspace.ledger, 'quarantine.json')
+		// Evidence lands beside the run's own journal, and the budget is the run's
+		// rather than the check's: no single check can see the total, and a suite
+		// failing everywhere is exactly when the files are largest.
+		const environment = defaultEnvironment(run, capabilities, {
+			quarantine: Quarantine.load(quarantinePath),
+			artefacts: new ArtefactStore(join(harness.workspace.results, run.id)),
+		})
+
+		const raw: Observation[] = []
+		if (preflight !== undefined) {
+			raw.push(preflight)
+			journal.append({ kind: 'observation', observation: preflight })
 		}
-		if (recorder !== undefined) saveDrift(driftPath, recordDrift(recorder, drift))
-	}
 
-	// Last, so nobody is told about a run whose ledgers have not settled, and
-	// after the console so the two can never disagree about one run.
-	if (channel !== undefined) {
-		const outcome = await notify({
-			channel,
-			statePath: `${stem}.notify.json`,
-			name: harness.name,
+		if (preflight?.verdict !== 'blocked') {
+			raw.push(...(await runChecks(checks, environment, { journal, concurrency: options.workers })))
+		}
+
+		const scope = [...run.suites].sort().join('+')
+		const stem = join(harness.workspace.baselines, `${run.target}--${run.environment}--${scope}`)
+		const measurements = loadBaseline(`${stem}.measurements.json`)
+
+		// Judged after the checks have all run, so a slow measurement is a verdict on
+		// an observation that otherwise passed rather than something a check body has
+		// to know how to decide for itself.
+		const driftPath = join(harness.workspace.ledger, `${run.target}.drift.json`)
+		const drift = loadDrift(driftPath)
+
+		const alone = options.workers === 1
+		const observations = [
+			...(alone ? judgeMeasurements(raw, measurements) : raw),
+			...(recorder === undefined
+				? []
+				: judgeDrift(recorder, drift, {
+						target: run.target,
+						runId: run.id,
+						startedAt: run.startedAt,
+					})),
+		]
+		const policy = { degradedIsRed: options.degradedIsRed }
+		const summary = summarize(observations, readSignature(`${stem}.signature`), policy)
+
+		reportToConsole(run, observations, summary, { name: harness.name, verbose: options.verbose })
+		writeJsonReport(
+			join(harness.workspace.results, run.id, 'report.json'),
 			run,
 			observations,
 			summary,
-			remember: options.record,
-		})
+		)
 
-		if (outcome.failure !== undefined) {
-			process.stderr.write(
-				`\n  ${harness.name}: ${channel.name} (${channel.where}) could not be told — ${outcome.failure}\n` +
-					'  Nothing was recorded as sent, so the next run says this again.\n',
-			)
-			return 3
+		if (areas.length > 0) {
+			// Written every run and printed only when asked: a sign-off sheet is an
+			// artefact somebody reads deliberately, and a wall of green after every
+			// run is what the silence contract exists to prevent.
+			const rows = buildMatrix(areas, observations)
+			writeMatrix(join(harness.workspace.results, run.id, 'matrix'), run, rows)
+			if (options.matrix) renderMatrix(rows, line => process.stdout.write(`${line}\n`))
 		}
-		if (outcome.told) process.stdout.write(`  told ${channel.name}: ${channel.where}\n\n`)
-	}
+		journal.append({ kind: 'run-finished', at: new Date().toISOString(), red: summary.red })
 
-	return summary.red ? 1 : 0
+		// Recorded whatever the run did, unlike the baselines below: a failure is the
+		// observation being counted here. The proposal is suppressed with the ledger
+		// rather than kept, since the history behind it would not be there.
+		if (options.record) {
+			const flakePath = join(harness.workspace.ledger, `${run.target}.flake.json`)
+			const before = new Set(candidates(loadFlakes(flakePath)).map(candidate => candidate.id))
+			const flakes = recordOutcomes(observations, loadFlakes(flakePath))
+			saveFlakes(flakePath, flakes)
+
+			const fresh = candidates(flakes).filter(candidate => !before.has(candidate.id))
+			for (const candidate of fresh) {
+				process.stdout.write(
+					`\n  ${candidate.id} has not passed ${candidate.failures} of its last ${candidate.runs} runs ` +
+						`(${Math.round(candidate.rate * 100)}%)${candidate.rescuedByRetry ? ', and a retry has rescued it' : ''}.\n` +
+						`  Fix it, or quarantine it: ${harness.name} quarantine add ${candidate.id} --reason "..." --days 14\n` +
+						`  History that should not have been kept: ${harness.name} flakes --forget ${candidate.id}\n`,
+				)
+			}
+		}
+
+		// Neither history moves on a red run. Recording a failure as the new normal is
+		// how a suite talks itself into silence about it, and recording a broken run's
+		// timings teaches the baseline to accept the breakage.
+		if (options.record && !summary.red) {
+			writeSignature(`${stem}.signature`, summary.signature)
+			// Only a run that had the target to itself contributes a timing. Folding
+			// in a number measured while the harness was loading the target teaches
+			// the baseline to accept slowness, which is the alarm turning itself off.
+			if (alone) {
+				saveBaseline(`${stem}.measurements.json`, recordMeasurements(observations, measurements))
+			}
+			if (recorder !== undefined) saveDrift(driftPath, recordDrift(recorder, drift))
+		}
+
+		// Last, so nobody is told about a run whose ledgers have not settled, and
+		// after the console so the two can never disagree about one run.
+		if (channel !== undefined) {
+			const outcome = await notify({
+				channel,
+				statePath: `${stem}.notify.json`,
+				name: harness.name,
+				run,
+				observations,
+				summary,
+				remember: options.record,
+			})
+
+			if (outcome.failure !== undefined) {
+				process.stderr.write(
+					`\n  ${harness.name}: ${channel.name} (${channel.where}) could not be told — ${outcome.failure}\n` +
+						'  Nothing was recorded as sent, so the next run says this again.\n',
+				)
+				return 3
+			}
+			if (outcome.told) process.stdout.write(`  told ${channel.name}: ${channel.where}\n\n`)
+		}
+
+		return summary.red ? 1 : 0
+	} finally {
+		lock.release()
+	}
 }

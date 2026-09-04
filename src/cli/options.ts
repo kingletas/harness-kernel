@@ -25,6 +25,9 @@ Usage:
   ${harness.name} flakes [--target <name>]   Checks whose recent history is inconsistent
   ${harness.name} flakes --forget <id>       Drop one check's history from the ledger
   ${harness.name} notify --test              Send one message to prove the channel works
+  ${harness.name} schedule plan --target <name>    Print the units a schedule needs
+  ${harness.name} schedule install --target <name> Write them, enabling nothing
+  ${harness.name} schedule report [--days 7]       What every schedule has been doing
   ${harness.name} help
 ${Object.values(extras)
 	.map(extra => `  ${harness.name} ${extra.usage}`)

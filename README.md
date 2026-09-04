@@ -46,6 +46,8 @@ The other direction. [Proving it](#proving-it), below, is what that means.
   them.
 - **A console that says nothing** when the run is green and its known exceptions
   are unchanged.
+- **One run at a time per target**, and a lock that a crashed run cannot leave
+  jamming every run after it.
 - **A channel that says nothing either** — mail or an incoming webhook, carrying
   the console's own text, backing off a story it has already told and refusing
   to call a recovery until it has held.
@@ -89,6 +91,23 @@ is unchanged reaches nobody. A failure that persists is repeated after 2 runs,
 then 4, 8, 16 and 32 — held per story, so two failures taking turns do not reset
 each other's schedule — and a recovery is announced only once it has held for two
 runs.
+
+## Scheduling it
+
+```bash
+<tool> schedule plan --target <name> --every daily     # print the units, write nothing
+<tool> schedule install --target <name> --every daily  # write them, enable nothing
+<tool> schedule report --days 7                        # what the schedule has been doing
+```
+
+`install` writes a systemd user service and timer and prints the commands that
+enable them; it never runs those itself. The timer carries `Persistent=true`, so
+a window missed while the machine was off runs once it comes back, and the
+channel's variables come from an `EnvironmentFile` rather than from the unit.
+
+`report` is the weekly read. The line that matters most is the longest stretch
+with no run at all, because a schedule that quietly stopped firing looks exactly
+like one with nothing to say.
 
 ## Proving it
 

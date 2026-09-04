@@ -12,6 +12,8 @@ export interface Workspace {
 	readonly baselines: string
 	/** Per run, and never committed: the journal, the report and the sign-off sheet. */
 	readonly results: string
+	/** One file per target while a run is in flight, so a schedule cannot start a second. */
+	readonly locks: string
 }
 
 /**
@@ -24,4 +26,5 @@ export const workspaceAt = (root: string): Workspace => ({
 	ledger: join(root, 'ledger'),
 	baselines: join(root, 'baselines'),
 	results: join(root, 'results'),
+	locks: join(root, 'results', '.locks'),
 })

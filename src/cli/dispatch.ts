@@ -7,6 +7,7 @@ import { quarantineCommand } from './commands/quarantine.js'
 import { runAgainstTarget } from './commands/run.js'
 import { selfcheck } from './commands/selfcheck.js'
 import { testChannel } from './commands/notify.js'
+import { scheduleCommand } from './commands/schedule.js'
 import { listTargets } from './commands/targets.js'
 import type { Harness } from './harness.js'
 
@@ -19,6 +20,14 @@ export const runCli = async (
 	argv: readonly string[],
 	extras: Readonly<Record<string, ExtraCommand>> = {},
 ): Promise<number> => {
+	// A reader closing the pipe is how `| head` ends, not a fault. Without this
+	// the write throws an unhandled EPIPE and a stack trace is the last thing a
+	// person sees instead of the output they asked for.
+	process.stdout.on('error', error => {
+		if ((error as NodeJS.ErrnoException).code === 'EPIPE') process.exit(0)
+		throw error
+	})
+
 	const [command = 'help', ...rest] = argv
 	const USAGE = usageFor(harness, extras)
 
@@ -59,6 +68,8 @@ export const runCli = async (
 			return probeTarget(harness, parse(rest))
 		case 'quarantine':
 			return quarantineCommand(harness, rest)
+		case 'schedule':
+			return scheduleCommand(harness, rest)
 		case 'notify': {
 			if (!rest.includes('--test')) {
 				process.stderr.write(`usage: ${harness.name} notify --test\n`)
