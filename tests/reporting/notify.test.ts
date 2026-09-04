@@ -96,6 +96,21 @@ describe('telling somebody', () => {
 		assert.equal(working.sent.length, 1)
 	})
 
+	it('names what a recovery recovered from', async () => {
+		// A red run records no signature, so once it clears the console has nothing
+		// changed to render and the message would say only that something is better.
+		const path = tempPath()
+		const channel = spy()
+		await tell(channel, path, [at('a', 'fail')])
+		await tell(channel, path, [at('a', 'pass')])
+		await tell(channel, path, [at('a', 'pass')])
+
+		const recovery = channel.sent.at(-1)
+		assert.equal(recovery?.subject, 'drexbot stub/local: recovered')
+		assert.match(recovery?.body ?? '', /No longer reported:/)
+		assert.match(recovery?.body ?? '', /a:fail/)
+	})
+
 	it('goes quiet once the same story has been delivered', async () => {
 		const path = tempPath()
 		const channel = spy()

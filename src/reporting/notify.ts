@@ -129,6 +129,15 @@ export const renderNotification = (
 				: `${nonPassing(summary)} of ${summary.total} checks are not passing.`
 
 	lines.push(preamble)
+
+	// What a recovery is a recovery from. A red run records no signature, so by
+	// the time it clears the console has nothing changed to render and the
+	// message would otherwise say only that something unnamed is better.
+	if (decision.kind === 'recovered' && decision.wasTold !== '') {
+		lines.push('', 'No longer reported:')
+		for (const line of decision.wasTold.split('\n')) lines.push(`  ${line}`)
+	}
+
 	reportToConsole(run, observations, summary, {
 		colour: false,
 		name,

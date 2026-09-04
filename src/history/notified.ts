@@ -43,6 +43,8 @@ export type NotifyDecision =
 			readonly sends: number
 			readonly runsSince: number
 			readonly since: string
+			/** The story the channel last carried, which a recovery is a recovery from. */
+			readonly wasTold: string
 			readonly next: NotifyState
 	  }
 
@@ -116,6 +118,7 @@ export const decideNotification = (
 			sends: (previous?.sends ?? 0) + 1,
 			runsSince: previous?.runsSince ?? 0,
 			since: previous?.firstSentAt ?? at,
+			wasTold: state.told,
 			next: {
 				told: story,
 				settling: '',
@@ -143,6 +146,7 @@ export const decideNotification = (
 		sends: (previous?.sends ?? 0) + 1,
 		runsSince: previous?.runsSince ?? 0,
 		since: previous?.firstSentAt ?? at,
+		wasTold: state.told,
 		next: {
 			told: story,
 			settling: '',
