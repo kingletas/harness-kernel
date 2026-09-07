@@ -4,7 +4,7 @@ Thanks for looking. This is a small kernel with one hard constraint, and that co
 
 ## The one promise
 
-**The kernel knows nothing about any target.** It is handed a registry and a workspace and reaches for neither. The test for whether something belongs here is whether it would still make sense if a third target arrived that resembled neither of the two that exist — a CLI, a queue consumer, a mobile app. Percentiles belong. Add-to-cart does not.
+**The kernel knows nothing about any target.** It's handed a registry and a workspace and reaches for neither. The test for whether something belongs here is whether it would still make sense if a third target arrived that resembled neither of the two that exist — a CLI, a queue consumer, a mobile app. Percentiles belong. Add-to-cart doesn't.
 
 A pull request that teaches the kernel about a particular kind of target is almost always a change to the wrong package: the behaviour belongs in the harness that owns that target, reached through `Capabilities` or through a check of its own.
 
@@ -22,7 +22,7 @@ make setup
 make check
 ```
 
-That is the build, eslint, prettier and the unit suite, and it is exactly what the pre-commit hook runs. All four must be clean.
+That's the build, eslint, prettier and the unit suite, and it's exactly what the pre-commit hook runs. All four must be clean.
 
 ```bash
 make selfcheck-loud
@@ -34,11 +34,11 @@ A green run proves nothing about the alarm, and a firing alarm proves nothing ab
 
 ## The ideas worth knowing before you write
 
-- **Eight verdicts, ordered least to most severe, and aggregation takes the maximum.** `pass`, `skipped`, `unsupported`, `quarantined`, `flaky`, `degraded`, `blocked`, `fail`. Pass and fail alone is how a suite becomes noise. A check that cannot mean anything against a target reports `unsupported` and names the missing capability — it never fails, and it is never silently absent from the summary.
-- **Only a pass may be silent.** Every other verdict states a reason; `requiresReason` is not advisory.
+- **Eight verdicts, ordered least to most severe, and aggregation takes the maximum.** `pass`, `skipped`, `unsupported`, `quarantined`, `flaky`, `degraded`, `blocked`, `fail`. Pass and fail alone is how a suite becomes noise. A check that can't mean anything against a target reports `unsupported` and names the missing capability — it never fails, and it's never silently absent from the summary.
+- **Only a pass may be silent.** Every other verdict states a reason; `requiresReason` isn't advisory.
 - **`flaky` and `quarantined` are statements about the suite, not about the target**, so neither turns a run red. `degraded` is policy and defaults to amber.
 - **A capability is declared by the target, and `isDisposable` by the environment.** Nothing is available until a target says otherwise — `NO_CAPABILITIES` is the floor. A suite never declares that it may write destructively to something.
-- **The console says nothing** when the run is green and its known exceptions are unchanged. Anything new that emits needs an answer to what it is silent for.
+- **The console says nothing** when the run is green and its known exceptions are unchanged. Anything new that emits needs an answer to what it's silent for.
 - **Five ledgers**: the signature, the measurement baseline, the drift ledger, the flake ledger and the quarantine list. A change to what any of them records is a change to what a diff means to a reviewer, so say so in the pull request.
 - **Comments say what the code does or what it guards against**, in a sentence or two. History belongs in the commit message and the changelog.
 
@@ -60,4 +60,4 @@ A green run proves nothing about the alarm, and a firing alarm proves nothing ab
 
 ## Security
 
-Please do not open a public issue for a vulnerability. [SECURITY.md](SECURITY.md) has the model and the reporting route.
+Please don't open a public issue for a vulnerability. [SECURITY.md](SECURITY.md) has the model and the reporting route.

@@ -8,7 +8,7 @@ A test kernel that knows nothing about any target.
 Everything here would still make sense if a third target arrived that was
 neither of the two that exist — a CLI, a queue consumer, a mobile app. The test
 for whether something belongs is exactly that: percentiles belong, add-to-cart
-does not.
+doesn't.
 
 ## Documentation
 
@@ -30,7 +30,7 @@ Not on npm. Depend on the repository:
 npm install github:kingletas/harness-kernel
 ```
 
-It has **no runtime dependencies** and builds itself on install, so the only thing it brings with it is Node.
+It has **no runtime dependencies** and builds itself on install, so the only thing it brings with it's Node.
 
 ## Checking it
 
@@ -51,7 +51,7 @@ The other direction. [Proving it](#proving-it), below, is what that means.
 - **A run**: an id, a seed every check derives its own stream from, and a build
   stamped at preflight so a result three weeks old is still attributable.
 - **Eight verdicts**, because pass and fail is how a suite becomes noise. A
-  check that cannot mean anything against a target reports `unsupported` and
+  check that can't mean anything against a target reports `unsupported` and
   names the missing capability; it never fails and is never silently absent.
 - **A worker pool with a declared width**, and a circuit breaker whose
   _consecutive_ means "with nothing reaching the target in between" so it still
@@ -61,7 +61,7 @@ The other direction. [Proving it](#proving-it), below, is what that means.
   them.
 - **A console that says nothing** when the run is green and its known exceptions
   are unchanged.
-- **One run at a time per target**, and a lock that a crashed run cannot leave
+- **One run at a time per target**, and a lock that a crashed run can't leave
   jamming every run after it.
 - **A channel that says nothing either** — mail or an incoming webhook, carrying
   the console's own text, backing off a story it has already told and refusing
@@ -90,7 +90,7 @@ than by editing a switch.
 ## Telling somebody
 
 A scheduled run nobody reads is worse than no run, so the kernel can hand a run
-to a channel. It is off unless the environment asks for it:
+to a channel. It's off unless the environment asks for it:
 
 ```bash
 HARNESS_NOTIFY=mail HARNESS_NOTIFY_SMTP=127.0.0.1:1025 HARNESS_NOTIFY_TO=you@example.test
@@ -98,12 +98,12 @@ HARNESS_NOTIFY=webhook HARNESS_NOTIFY_WEBHOOK=https://chat.example/hooks/...
 ```
 
 `notify --test` sends one message and names where it went. A channel described
-wrongly is refused before the first check runs, and a message that could not be
+wrongly is refused before the first check runs, and a message that couldn't be
 delivered exits **3** and records nothing as sent, so the next run says it again.
 
 The channel is quiet in exactly the cases the console is: a green run whose story
 is unchanged reaches nobody. A failure that persists is repeated after 2 runs,
-then 4, 8, 16 and 32 — held per story, so two failures taking turns do not reset
+then 4, 8, 16 and 32 — held per story, so two failures taking turns don't reset
 each other's schedule — and a recovery is announced only once it has held for two
 runs.
 
