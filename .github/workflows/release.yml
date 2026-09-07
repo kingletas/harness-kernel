@@ -1,0 +1,128 @@
+name: Release
+
+# Tagging is the whole trigger: `git tag v0.4.0 && git push --tags` proves a
+# consumer can install the tagged commit and use it, then publishes a GitHub
+# Release whose body is that version's CHANGELOG section.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 0.4.0)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # The tag, the declared version and the changelog have to agree, or the
+      # release ships one version's notes under another version's name.
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          declared="$(node -p "require('./package.json').version")"
+          locked="$(node -p "require('./package-lock.json').version")"
+          if [ "$version" != "$declared" ]; then
+            echo "::error::tag says $version, package.json says $declared"
+            exit 1
+          fi
+          # The lockfile carries the version too, and has been left behind before.
+          if [ "$version" != "$locked" ]; then
+            echo "::error::tag says $version, package-lock.json says $locked"
+            exit 1
+          fi
+          packaging/release-notes.sh "$version" > /dev/null
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  install:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      # No checkout: the point is to get the package the way a harness does,
+      # from the tagged commit on GitHub. CI already runs the suite against the
+      # working tree, so what is left to prove at a tag is that an install of it
+      # is usable -- which is how the shipped command was broken and unnoticed.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20.x'
+
+      - name: Install it the way a harness does
+        run: |
+          mkdir -p consumer && cd consumer
+          npm init -y > /dev/null
+          npm install "github:${GITHUB_REPOSITORY}#${GITHUB_SHA}"
+
+      - name: Check a consumer gets the whole public surface
+        working-directory: consumer
+        run: |
+          node --input-type=module -e '
+          import { VERDICTS, runCli, registryOf, workspaceAt } from "harness-kernel"
+          import assert from "node:assert/strict"
+          assert.equal(VERDICTS.length, 8, "the verdict vocabulary did not survive packaging")
+          for (const [name, value] of Object.entries({ runCli, registryOf, workspaceAt })) {
+            assert.equal(typeof value, "function", `${name} is not exported`)
+          }
+          console.log("the package exports what a harness is built on")'
+
+      # Judged on the report it wrote rather than on what it printed: a run
+      # whose outcome is unchanged says nothing on purpose, so an assertion on
+      # the console passes on a fresh runner and fails the second time anybody
+      # runs it by hand.
+      - name: Check the shipped command runs from an install
+        working-directory: consumer
+        run: |
+          npx harness-selfcheck selfcheck
+          node --input-type=module -e '
+          import { readFileSync, readdirSync } from "node:fs"
+          import assert from "node:assert/strict"
+          const root = "node_modules/harness-kernel/results"
+          const runs = readdirSync(root).filter(name => !name.startsWith("."))
+          assert.equal(runs.length, 1, `expected one run directory, found ${runs.length}`)
+          const report = JSON.parse(readFileSync(`${root}/${runs[0]}/report.json`, "utf8"))
+          assert.ok(report.observations.length > 0, "the run recorded no observations")
+          assert.equal(report.summary.red, false, `the run was red: worst was ${report.summary.worst}`)
+          assert.equal(report.summary.counts.fail, 0, "a check failed")
+          console.log(`the installed command ran ${report.summary.total} checks, none red`)'
+
+  publish:
+    needs: [version, install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # The release body is the changelog entry rather than a second account of
+      # the same release written by hand.
+      #
+      # Moving a tag runs this again, and creating a release that already exists
+      # is an error, so an existing one is updated in place.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          packaging/release-notes.sh "$version" > notes.md
+          if gh release view "v${version}" >/dev/null 2>&1; then
+            echo "v${version} exists: updating its notes"
+            gh release edit "v${version}" \
+              --title "harness-kernel ${version}" \
+              --notes-file notes.md
+          else
+            gh release create "v${version}" \
+              --target "$GITHUB_SHA" \
+              --title "harness-kernel ${version}" \
+              --notes-file notes.md
+          fi

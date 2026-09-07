@@ -1,11 +1,26 @@
 # harness-kernel
 
+[![CI](https://github.com/kingletas/harness-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/kingletas/harness-kernel/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A test kernel that knows nothing about any target.
 
 Everything here would still make sense if a third target arrived that was
 neither of the two that exist — a CLI, a queue consumer, a mobile app. The test
 for whether something belongs is exactly that: percentiles belong, add-to-cart
 does not.
+
+## Documentation
+
+|                                                          |                                                    |
+| -------------------------------------------------------- | -------------------------------------------------- |
+| [From nothing to your own harness](docs/from-nothing.md) | Build one from an empty directory. Start here      |
+| [Getting started](docs/getting-started.md)               | You have built one before. Ten minutes             |
+| [User guide](docs/user-guide.md)                         | Every command, flag and verdict a harness inherits |
+| [Configuration](docs/configuration.md)                   | The environment it reads, and what to commit       |
+| [Architecture](docs/architecture.md)                     | What is inside, and how to change it               |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                       | The shape a change should arrive in                |
+| [SECURITY.md](SECURITY.md)                               | The model, and where to report something           |
 
 ## Installing it
 
