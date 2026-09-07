@@ -2,6 +2,12 @@
 
 ## 0.4.0
 
+**`harness-selfcheck` works when it's installed.** npm puts a package's command
+into `node_modules/.bin` as a symlink, and the wrapper worked out where `dist/`
+was from the path it was invoked by — so an installed copy looked for the CLI
+beside the symlink and died with a module it couldn't find. It follows the link
+chain first now. The command has never worked from an install until this.
+
 **One run at a time per target.** A lock is taken before the first check and
 released in a `finally`; a second run against the same target and environment
 names the holder and does nothing rather than writing the same ledgers twice.
