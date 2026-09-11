@@ -35,6 +35,11 @@ export class TransportFailure extends Error {
 	override readonly name = 'TransportFailure'
 }
 
+/** An attempt ran past its time limit, so the kernel stopped waiting for it. */
+export class CheckTimeout extends Error {
+	override readonly name = 'CheckTimeout'
+}
+
 const TRANSPORT_CODES = new Set([
 	'ECONNREFUSED',
 	'ECONNRESET',
@@ -90,6 +95,7 @@ export const classify = (error: unknown): FailureClass => {
 	if (error instanceof AssertionFailure) return 'assertion'
 	if (error instanceof PreconditionFailure) return 'precondition'
 	if (error instanceof TransportFailure) return 'transport'
+	if (error instanceof CheckTimeout) return 'timeout'
 	if (looksLikeAssertion(error)) return 'assertion'
 
 	const code = codeOf(error)

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+**A check that stops making progress ends in a verdict.** Every attempt now has a time limit, ten minutes unless the run or the check says otherwise, and an attempt that runs past it fails as a `timeout`, which the retry policy treats like any other timeout. Before this, a body waiting on something that never answered held the run open indefinitely, with nothing in the journal to say where.
+
+**The body is told, and gets to say where it was.** `CheckContext` carries an `AbortSignal` that fires at the limit. A body that closes its browser or socket on abort fails the call it was stuck in, and that failure goes into the reason: _ran past its 180s time limit, and was stopped in: …_. The kernel waits up to 30 seconds for it, then reports without it and says the body may still be running.
+
+**`timeLimitMs` on a check, and on the environment.** A check's own limit wins over the run's. A limit of zero, or one too large for a Node timer to hold, is refused rather than read as no limit at all. `CheckTimeout` is the error an expired attempt fails with.
+
 ## 0.4.0
 
 **`harness-selfcheck` works when it's installed.** npm puts a package's command

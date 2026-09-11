@@ -11,7 +11,7 @@ One rule, six directories, and a public surface of exactly one file.
 - [What happens to one check](#what-happens-to-one-check)
 - [The run, end to end](#the-run-end-to-end)
 - [The directories](#the-directories)
-- [Five things that are deliberate](#five-things-that-are-deliberate)
+- [Six things that are deliberate](#six-things-that-are-deliberate)
 - [How a change gets made](#how-a-change-gets-made)
 
 ## The one rule
@@ -93,13 +93,15 @@ flowchart LR
 | `src/paths.ts`   | `workspaceAt`, and the only place the four directories are named                                                                                                      |
 | `fixtures/`      | The stub target. Every check in the suite runs against this, never a live target                                                                                      |
 
-## Five things that are deliberate
+## Six things that are deliberate
 
 **Nothing is reached for; everything is handed over.** The harness carries its own name, registry and workspace, and the kernel takes them as arguments. Two harnesses can't share a ledger by accident because neither one can find the other's.
 
 **A dead target costs one fact.** Three transport failures with nothing reaching the target in between and the circuit opens. "Consecutive" means _with nothing getting through in between_, which is what keeps it meaningful once checks interleave under a wide pool.
 
 **Only transport and timeout failures are ever retried.** Retrying an assertion hides the defect it found. A timeout gets two attempts rather than three, because hammering a slow target kills it.
+
+**No check waits for ever.** Every attempt has a time limit, ten minutes unless the check or the run sets its own, and the body's `signal` is aborted when it passes. A body that lets go of its browser or socket on abort fails in the call it was stuck in, and the verdict names that call. One that ignores the signal still gets a `timeout` verdict 30 seconds later, and the reason says it may still be running.
 
 **A wide run neither judges nor records timings.** A number taken alongside three other checks isn't comparable with one taken alone, so it declines to pretend rather than recording a slower number as a regression.
 

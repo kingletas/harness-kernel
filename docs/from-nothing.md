@@ -226,6 +226,8 @@ That's a working harness. Everything below is what you already have without writ
 
 **One fact when the target dies.** After three failures to reach it with nothing getting through in between, the rest of the run reports `blocked` immediately. One sentence, not forty timeouts.
 
+**No check that hangs.** Each attempt gets ten minutes unless you set `timeLimitMs` on the check. Past that, the kernel aborts the `signal` your body was handed, gives it a moment to let go, and reports a `timeout` that names the step it was stopped in. A browser left waiting on a page that will never answer ends as a verdict, not a process somebody has to kill.
+
 **A memory between runs.** Five ledgers: what wasn't green last time, how long things took, which selector candidate answered, which checks have been inconsistent, and what you've held out of the verdict on purpose. `--no-record` spares all of them at once.
 
 **One run at a time per target**, with a lock a crashed run can't leave jamming everything after it.

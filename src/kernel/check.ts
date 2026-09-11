@@ -1,7 +1,7 @@
 import type { Artefact, ArtefactStore } from './artefacts.js'
 import { missingCapabilities, type Capabilities, type CapabilityName } from './capabilities.js'
 import { CircuitBreaker, type CircuitToken } from './circuit.js'
-import { classify, describe, UnsupportedCapability } from './failure.js'
+import { CheckTimeout, classify, describe, UnsupportedCapability } from './failure.js'
 import {
 	observe,
 	type Attempt,
@@ -31,7 +31,21 @@ export interface CheckContext {
 	readonly artefactDir: () => string | undefined
 	/** Declares a file written into that directory, to be attached to the observation. */
 	readonly attach: (kind: string, absolutePath: string) => void
+	/**
+	 * Aborted when the attempt runs past its time limit. A body holding a browser
+	 * or a socket closes it on abort, so the step it was stuck in fails by name.
+	 */
+	readonly signal: AbortSignal
 }
+
+/** How long one attempt may run when neither the check nor the run says otherwise. */
+export const DEFAULT_TIME_LIMIT_MS = 10 * 60_000
+
+/** How long a body is given to stop, once it has been aborted, before the kernel walks away. */
+export const DEFAULT_SETTLE_MS = 30_000
+
+/** The longest delay a Node timer honours; anything above it fires at once. */
+const LONGEST_TIMER_MS = 2_147_483_647
 
 export interface CheckDefinition {
 	/** Stable across runs and across renames of the title. */
@@ -46,6 +60,8 @@ export interface CheckDefinition {
 	readonly retry?: RetryPolicy
 	/** A resource this check will not share; the pool runs no two of these at once. */
 	readonly contends?: string
+	/** How long one attempt may run before it fails as a timeout; overrides the run's. */
+	readonly timeLimitMs?: number
 	body(context: CheckContext): Promise<void>
 }
 
@@ -59,6 +75,71 @@ export interface CheckEnvironment {
 	readonly sleep: (ms: number) => Promise<void>
 	/** Where evidence goes and what the run may spend on it. Absent means keep none. */
 	readonly artefacts?: ArtefactStore
+	/** How long one attempt may run, unless the check declares its own. */
+	readonly timeLimitMs?: number
+	/** How long an aborted body is given to stop before the kernel stops waiting for it. */
+	readonly settleMs?: number
+}
+
+const seconds = (ms: number): string => `${ms / 1_000}s`
+
+const checkedLimit = (ms: number, what: string): number => {
+	if (!Number.isFinite(ms) || ms <= 0 || ms > LONGEST_TIMER_MS) {
+		throw new Error(`${what} must be a positive number of milliseconds under 2^31, not ${ms}`)
+	}
+	return ms
+}
+
+type Settled = { readonly state: 'returned' } | { readonly state: 'threw'; readonly error: unknown }
+
+/** What a promise did within `ms`, or undefined when it did neither. */
+const settledWithin = async (pending: Promise<void>, ms: number): Promise<Settled | undefined> => {
+	let timer: NodeJS.Timeout | undefined
+	const gaveUp = new Promise<undefined>(resolve => {
+		timer = setTimeout(() => resolve(undefined), ms)
+	})
+	try {
+		return await Promise.race([
+			pending.then(
+				(): Settled => ({ state: 'returned' }),
+				(error: unknown): Settled => ({ state: 'threw', error }),
+			),
+			gaveUp,
+		])
+	} finally {
+		clearTimeout(timer)
+	}
+}
+
+/**
+ * Runs one attempt of a body against its time limit. Past the limit the body is
+ * aborted and given `settleMs` to stop, so the step it was stuck in can be named.
+ */
+const attemptWithin = async (
+	body: (signal: AbortSignal) => Promise<void>,
+	limitMs: number,
+	settleMs: number,
+): Promise<void> => {
+	const controller = new AbortController()
+	const pending = body(controller.signal)
+
+	const settled = await settledWithin(pending, limitMs)
+	if (settled?.state === 'returned') return
+	if (settled?.state === 'threw') throw settled.error
+
+	const limit = `ran past its ${seconds(limitMs)} time limit`
+	controller.abort(new CheckTimeout(limit))
+
+	const stopped = await settledWithin(pending, settleMs)
+	if (stopped?.state === 'threw') {
+		throw new CheckTimeout(`${limit}, and was stopped in: ${describe(stopped.error)}`)
+	}
+	if (stopped === undefined) {
+		throw new CheckTimeout(
+			`${limit}, and did not stop within ${seconds(settleMs)} of being asked, so it may still be running`,
+		)
+	}
+	throw new CheckTimeout(limit)
 }
 
 export const defaultEnvironment = (
@@ -88,6 +169,13 @@ export const runCheck = async (
 	const startedAt = now()
 	const evidence: Evidence[] = []
 	const measurements: Measurement[] = []
+
+	// A limit of 0 means "none" to most browser libraries; here it is refused.
+	const limitMs = checkedLimit(
+		definition.timeLimitMs ?? environment.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS,
+		`the time limit for ${definition.id}`,
+	)
+	const settleMs = checkedLimit(environment.settleMs ?? DEFAULT_SETTLE_MS, 'the settle time')
 
 	const base = {
 		id: definition.id,
@@ -119,7 +207,7 @@ export const runCheck = async (
 	}
 
 	const store = environment.artefacts
-	const context: CheckContext = {
+	const context: Omit<CheckContext, 'signal'> = {
 		run,
 		rng: deriveRng(run.seed, definition.id),
 		record: (label, detail) => evidence.push({ label, detail }),
@@ -155,7 +243,7 @@ export const runCheck = async (
 		token = circuit.begin()
 
 		try {
-			await definition.body(context)
+			await attemptWithin(signal => definition.body({ ...context, signal }), limitMs, settleMs)
 			attempts.push({
 				number: attemptNumber,
 				outcome: 'ok',

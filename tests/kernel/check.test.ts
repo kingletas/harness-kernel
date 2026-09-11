@@ -9,11 +9,12 @@ import { defaultEnvironment, runCheck, type CheckDefinition } from '../../src/ke
 import { CircuitBreaker } from '../../src/kernel/circuit.js'
 import {
 	AssertionFailure,
+	CheckTimeout,
 	PreconditionFailure,
 	TransportFailure,
 } from '../../src/kernel/failure.js'
 import { Quarantine } from '../../src/history/quarantine.js'
-import { retryPolicy } from '../../src/kernel/retry.js'
+import { NO_RETRY, retryPolicy } from '../../src/kernel/retry.js'
 import { startRun } from '../../src/kernel/run.js'
 
 const run = startRun({ target: 'stub', environment: 'local', suites: ['t'], seed: 'fixed' })
@@ -250,5 +251,135 @@ describe('evidence a check left behind', () => {
 		)
 
 		assert.equal(offered, undefined)
+	})
+})
+
+describe('a check that runs past its time limit', () => {
+	const hangs = (): Promise<void> => new Promise(() => undefined)
+
+	/** Waits in a call that only the abort ends, the way a browser step does once its page is closed. */
+	const stuckUntilAborted =
+		(message: string): CheckDefinition['body'] =>
+		({ signal }) =>
+			new Promise((_, reject) => {
+				signal.addEventListener('abort', () => reject(new Error(message)), { once: true })
+			})
+
+	it('ends a body that never settles in a timeout verdict, within its limit', async () => {
+		const started = Date.now()
+		const observation = await runCheck(
+			check(hangs),
+			environmentWith({ timeLimitMs: 100, settleMs: 50, retry: NO_RETRY }),
+		)
+
+		assert.equal(observation.verdict, 'fail')
+		assert.equal(observation.attempts[0]?.failureClass, 'timeout')
+		assert.match(observation.reason ?? '', /^timeout: ran past its 0\.1s time limit/)
+		assert.match(observation.reason ?? '', /did not stop within 0\.05s of being asked/)
+		assert.ok(Date.now() - started < 2_000, 'the verdict arrived long after the limit')
+	})
+
+	it('aborts the body and names the step it was stopped in', async () => {
+		let reason: unknown
+		const observation = await runCheck(
+			check(async context => {
+				context.signal.addEventListener('abort', () => {
+					reason = context.signal.reason as unknown
+				})
+				await stuckUntilAborted('locator.click: Target page, context or browser has been closed')(
+					context,
+				)
+			}),
+			environmentWith({ timeLimitMs: 100, retry: NO_RETRY }),
+		)
+
+		assert.ok(reason instanceof CheckTimeout)
+		assert.equal(
+			observation.reason,
+			'timeout: ran past its 0.1s time limit, and was stopped in: ' +
+				'locator.click: Target page, context or browser has been closed',
+		)
+	})
+
+	it('retries it once, the way the policy retries any timeout', async () => {
+		let calls = 0
+		const observation = await runCheck(
+			check(async context => {
+				calls += 1
+				await stuckUntilAborted('stuck')(context)
+			}),
+			environmentWith({ timeLimitMs: 50 }),
+		)
+
+		assert.equal(calls, 2)
+		assert.equal(observation.verdict, 'fail')
+		assert.deepEqual(
+			observation.attempts.map(attempt => attempt.failureClass),
+			['timeout', 'timeout'],
+		)
+	})
+
+	it("holds a check to its own limit rather than the run's", async () => {
+		const observation = await runCheck(
+			check(stuckUntilAborted('stuck'), { timeLimitMs: 50 }),
+			environmentWith({ timeLimitMs: 60_000, retry: NO_RETRY }),
+		)
+
+		assert.match(observation.reason ?? '', /ran past its 0\.05s time limit/)
+	})
+
+	it('carries evidence the body attached while it was stopping', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'run-'))
+		const observation = await runCheck(
+			check(async ({ signal, artefactDir, attach }) => {
+				await new Promise<void>((_, reject) => {
+					signal.addEventListener('abort', () => {
+						const path = join(artefactDir() ?? root, 'trace.zip')
+						writeFileSync(path, Buffer.alloc(64))
+						attach('trace', path)
+						reject(new Error('closed'))
+					})
+				})
+			}),
+			environmentWith({ timeLimitMs: 50, retry: NO_RETRY, artefacts: new ArtefactStore(root) }),
+		)
+
+		assert.deepEqual(
+			observation.artefacts.map(artefact => artefact.kind),
+			['trace'],
+		)
+	})
+
+	it('leaves a check that finishes inside its limit alone', async () => {
+		let aborted = true
+		const observation = await runCheck(
+			check(async ({ signal }) => {
+				await new Promise(resolve => setTimeout(resolve, 20))
+				aborted = signal.aborted
+			}),
+			environmentWith({ timeLimitMs: 1_000 }),
+		)
+
+		assert.equal(observation.verdict, 'pass')
+		assert.equal(aborted, false)
+		assert.equal(observation.attempts.length, 1)
+	})
+
+	it('reports a body that throws inside its limit as it always did', async () => {
+		const observation = await runCheck(
+			check(async () => {
+				throw new AssertionFailure('the total was wrong')
+			}),
+			environmentWith({ timeLimitMs: 1_000 }),
+		)
+
+		assert.equal(observation.reason, 'assertion: the total was wrong')
+	})
+
+	it('refuses a limit of zero, which a browser library would read as no limit at all', async () => {
+		await assert.rejects(
+			runCheck(check(hangs, { timeLimitMs: 0 }), environmentWith()),
+			/the time limit for t\.one must be a positive number/,
+		)
 	})
 })
