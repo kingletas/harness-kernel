@@ -8,6 +8,8 @@
 
 **`timeLimitMs` on a check, and on the environment.** A check's own limit wins over the run's. A limit of zero, or one too large for a Node timer to hold, is refused rather than read as no limit at all. `CheckTimeout` is the error an expired attempt fails with.
 
+**An HTTP failure says why.** Node's `fetch` reports every failure as _fetch failed_ and keeps the real reason in `cause`, which `HttpSurface` used to drop. A refused connection now reads _GET …: fetch failed (ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:443)_, and an untrusted certificate names its code the same way. The original error is kept as the `TransportFailure`'s `cause`, so a caller can read the code instead of parsing the message.
+
 ## 0.4.0
 
 **`harness-selfcheck` works when it's installed.** npm puts a package's command

@@ -19,6 +19,27 @@ export interface HttpResponse {
 }
 
 /**
+ * The error's message plus its innermost cause, since Node's `fetch` says only
+ * "fetch failed" and keeps the real reason, such as an untrusted certificate, in `cause`.
+ */
+const detailOf = (error: unknown): string => {
+	if (!(error instanceof Error)) return String(error)
+
+	const seen = new Set<Error>([error])
+	let root: Error = error
+	while (root.cause instanceof Error && !seen.has(root.cause)) {
+		root = root.cause
+		seen.add(root)
+	}
+	if (root === error) return error.message
+
+	const code: unknown = (root as { code?: unknown }).code
+	const reason = typeof code === 'string' ? `${code}: ${root.message}` : root.message
+
+	return `${error.message} (${reason})`
+}
+
+/**
  * An HTTP surface that reports a dead socket as a transport failure, since Node
  * reports a refused connection as a bare `TypeError` the kernel would never retry.
  */
@@ -55,8 +76,7 @@ export class HttpSurface {
 				durationMs: Math.round(performance.now() - started),
 			}
 		} catch (cause) {
-			const detail = cause instanceof Error ? cause.message : String(cause)
-			throw new TransportFailure(`${request.method} ${url}: ${detail}`)
+			throw new TransportFailure(`${request.method} ${url}: ${detailOf(cause)}`, { cause })
 		} finally {
 			clearTimeout(timeout)
 		}
