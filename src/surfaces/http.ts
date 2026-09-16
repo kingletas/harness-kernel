@@ -34,9 +34,10 @@ const detailOf = (error: unknown): string => {
 	if (root === error) return error.message
 
 	const code: unknown = (root as { code?: unknown }).code
-	const reason = typeof code === 'string' ? `${code}: ${root.message}` : root.message
+	const parts = [typeof code === 'string' ? code : '', root.message].filter(part => part !== '')
+	if (parts.length === 0) return error.message
 
-	return `${error.message} (${reason})`
+	return `${error.message} (${parts.join(': ')})`
 }
 
 /**

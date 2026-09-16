@@ -64,6 +64,23 @@ describe('HttpSurface transport failures', () => {
 		}
 	})
 
+	it('names only the code when the cause has no message', async () => {
+		const realFetch = globalThis.fetch
+		globalThis.fetch = () =>
+			Promise.reject(
+				new TypeError('fetch failed', {
+					cause: Object.assign(new AggregateError([], ''), { code: 'ECONNREFUSED' }),
+				}),
+			)
+		try {
+			const failure = await failureOf(new HttpSurface('http://localhost:1'), '/')
+
+			assert.equal(failure.message, 'GET http://localhost:1/: fetch failed (ECONNREFUSED)')
+		} finally {
+			globalThis.fetch = realFetch
+		}
+	})
+
 	it('still answers normally when the request succeeds', async () => {
 		const server = createServer((_request, response) => response.end('ok'))
 		const url = await listen(server)
