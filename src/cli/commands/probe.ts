@@ -1,10 +1,11 @@
+import { describe } from '../../kernel/failure.js'
 import { renderProbe } from '../../kernel/probe.js'
 import type { Options } from '../options.js'
 import type { Harness } from '../harness.js'
 
 /**
  * Reports what the suite can find on a site and judges nothing, exiting 0 even
- * when nothing resolves — a probe that failed would be a gate.
+ * when nothing resolves; it exits 1 only when the probe itself could not run.
  */
 export const probeTarget = async (harness: Harness, options: Options): Promise<number> => {
 	if (options.target === undefined) {
@@ -27,6 +28,9 @@ export const probeTarget = async (harness: Harness, options: Options): Promise<n
 	try {
 		renderProbe(await target.probe(), line => process.stdout.write(`${line}\n`))
 		return 0
+	} catch (error) {
+		process.stderr.write(`${harness.name}: could not probe ${target.name} — ${describe(error)}\n`)
+		return 1
 	} finally {
 		await target.dispose?.()
 	}

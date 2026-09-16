@@ -10,6 +10,8 @@
 
 **An HTTP failure says why.** Node's `fetch` reports every failure as _fetch failed_ and keeps the real reason in `cause`, which `HttpSurface` used to drop. A refused connection now reads _GET …: fetch failed (ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:443)_, and an untrusted certificate names its code the same way. The original error is kept as the `TransportFailure`'s `cause`, so a caller can read the code instead of parsing the message.
 
+**A probe that cannot run says why, and exits 1.** When a target's `probe()` threw, for example because its browser could not start, the error escaped the command and Node printed a stack trace. `probe` now prints one line, _tool: could not probe magento — …_, releases the target and exits 1. A probe that runs still exits 0 whatever it finds, including a store that isn't there.
+
 ## 0.4.0
 
 **`harness-selfcheck` works when it's installed.** npm puts a package's command
