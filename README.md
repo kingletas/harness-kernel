@@ -19,6 +19,7 @@ doesn't.
 | [User guide](docs/user-guide.md)                         | Every command, flag and verdict a harness inherits |
 | [Configuration](docs/configuration.md)                   | The environment it reads, and what to commit       |
 | [Architecture](docs/architecture.md)                     | What is inside, and how to change it               |
+| [Why it exists](docs/why.md)                             | The problem it was extracted from, and the one rule |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                       | The shape a change should arrive in                |
 | [SECURITY.md](SECURITY.md)                               | The model, and where to report something           |
 
