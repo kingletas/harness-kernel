@@ -9,10 +9,10 @@ import {
 } from '../../src/schedule/systemd.js'
 
 const spec: ScheduleSpec = {
-	name: 'houndbot',
-	target: 'nemesis',
+	name: 'testbot',
+	target: 'storefront',
 	onCalendar: 'daily',
-	command: '/home/somebody/harness/bin/houndbot',
+	command: '/home/somebody/harness/bin/testbot',
 	workingDirectory: '/home/somebody/harness',
 }
 
@@ -38,7 +38,7 @@ describe('the units a schedule is made of', () => {
 
 	it('keeps the channel own variables out of the unit', () => {
 		const unit = serviceUnit({ ...spec })
-		assert.match(unit, /EnvironmentFile=-%h\/\.config\/houndbot-nemesis\.env/)
+		assert.match(unit, /EnvironmentFile=-%h\/\.config\/testbot-storefront\.env/)
 		assert.ok(!unit.includes('HARNESS_NOTIFY'), 'a webhook URL carries its token')
 	})
 

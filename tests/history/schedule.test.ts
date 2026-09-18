@@ -18,7 +18,7 @@ const results = (
 				run: {
 					id: run.id,
 					seed: 'x',
-					target: run.target ?? 'nemesis',
+					target: run.target ?? 'storefront',
 					environment: 'local',
 					suites: ['smoke'],
 					startedAt: run.at,
@@ -50,7 +50,7 @@ describe('what the schedule has been doing', () => {
 
 	it('keeps each target apart, so a busy one cannot cover for a stopped one', () => {
 		const root = results([
-			{ id: 'a', at: '2026-09-01T02:00:00.000Z', target: 'nemesis' },
+			{ id: 'a', at: '2026-09-01T02:00:00.000Z', target: 'storefront' },
 			{ id: 'b', at: '2026-09-07T02:00:00.000Z', target: 'magento' },
 		])
 
@@ -58,7 +58,7 @@ describe('what the schedule has been doing', () => {
 			digest(readReports(root))
 				.map(window => window.target)
 				.sort(),
-			['magento', 'nemesis'],
+			['magento', 'storefront'],
 		)
 	})
 
@@ -84,7 +84,7 @@ describe('what the schedule has been doing', () => {
 				run: {
 					id: 'a',
 					seed: 'x',
-					target: 'nemesis',
+					target: 'storefront',
 					environment: 'local',
 					suites: ['smoke'],
 					startedAt: '2026-09-07T02:00:00.000Z',

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import { acquireLock, releaseLock } from '../../src/kernel/lock.js'
 
-const lockPath = (): string => join(mkdtempSync(join(tmpdir(), 'lock-')), 'nemesis--local.lock')
+const lockPath = (): string => join(mkdtempSync(join(tmpdir(), 'lock-')), 'storefront--local.lock')
 
 const alive = () => true
 const dead = () => false

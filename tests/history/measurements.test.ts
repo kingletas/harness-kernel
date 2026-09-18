@@ -137,7 +137,7 @@ describe('loadBaseline', () => {
 	it('is empty rather than fatal when the file is corrupt', () => {
 		// The worst a corrupt baseline can cost is the history. A run that refuses
 		// to start because of it costs the run.
-		const path = join(mkdtempSync(join(tmpdir(), 'houndbot-')), 'baseline.json')
+		const path = join(mkdtempSync(join(tmpdir(), 'testbot-')), 'baseline.json')
 		writeFileSync(path, '{ not json', 'utf8')
 
 		assert.deepEqual(loadBaseline(path), emptyBaseline())

@@ -77,8 +77,9 @@ end, because a channel is only wired when something has arrived at the far end.
 would not — which is how the selfcheck is used to prove the channel.
 
 **A report no longer tells a reader to run another tool.** The console header and
-the flake, quarantine and forget hints all named `houndbot`, whatever tool was
-running: a drexbot failure advised a command that does not exist on that machine.
+the flake, quarantine and forget hints all named one particular harness, whatever
+tool was running: a drexbot failure advised a command that does not exist on that
+machine.
 
 ## 0.2.0
 
@@ -91,9 +92,9 @@ dependency name; nothing else about the API moved.
 
 The first release, and the first one anybody else can install.
 
-Extracted from `houndbot`, where it was built as the shared half of a harness
-that tested a Magento storefront and the Hound backend from one package. The
-full history to that point is in that repository.
+Extracted from a private harness, where it was built as the shared half of a
+package that tested a Magento storefront and an internal backend from one place.
+The full history to that point is in that repository.
 
 The kernel knows no target: the registry and the workspace are handed to it, and
 it reaches for neither. **Zero runtime dependencies** — what it installs is Node

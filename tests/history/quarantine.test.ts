@@ -37,7 +37,7 @@ describe('Quarantine', () => {
 	})
 
 	it('survives a round trip through a file', () => {
-		const path = join(mkdtempSync(join(tmpdir(), 'houndbot-')), 'quarantine.json')
+		const path = join(mkdtempSync(join(tmpdir(), 'testbot-')), 'quarantine.json')
 		Quarantine.from([entry('a', '2026-09-01T00:00:00.000Z')]).save(path)
 
 		assert.equal(Quarantine.load(path).entryFor('a', now)?.reason, 'races against the indexer')

@@ -7,7 +7,7 @@ import { Journal } from '../../src/kernel/journal.js'
 import { observe } from '../../src/kernel/observation.js'
 import { startRun } from '../../src/kernel/run.js'
 
-const temporaryPath = (): string => join(mkdtempSync(join(tmpdir(), 'houndbot-')), 'run.jsonl')
+const temporaryPath = (): string => join(mkdtempSync(join(tmpdir(), 'testbot-')), 'run.jsonl')
 
 const observation = (id: string) =>
 	observe({
