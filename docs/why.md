@@ -12,7 +12,7 @@ The cost of that is not duplication. It is that a fix to the percentile calculat
 
 ## Why not a general test framework
 
-Because the thing being shared is not assertions. Jest, pytest and their relatives own the shape of a *test file* — describe, it, expect. What was needed is the shape of a **run**: preflight, selection, ordering, timing, the verdict, the exit code, the artefact you read afterwards.
+Because the thing being shared is not assertions. Jest, pytest and their relatives own the shape of a _test file_ — describe, it, expect. What was needed is the shape of a **run**: preflight, selection, ordering, timing, the verdict, the exit code, the artefact you read afterwards.
 
 That layer sits above a test framework rather than replacing one, and no framework offers it because it is opinionated about things a general framework must stay neutral on.
 

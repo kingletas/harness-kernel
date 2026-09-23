@@ -12,16 +12,16 @@ doesn't.
 
 ## Documentation
 
-|                                                          |                                                    |
-| -------------------------------------------------------- | -------------------------------------------------- |
-| [From nothing to your own harness](docs/from-nothing.md) | Build one from an empty directory. Start here      |
-| [Getting started](docs/getting-started.md)               | You have built one before. Ten minutes             |
-| [User guide](docs/user-guide.md)                         | Every command, flag and verdict a harness inherits |
-| [Configuration](docs/configuration.md)                   | The environment it reads, and what to commit       |
-| [Architecture](docs/architecture.md)                     | What is inside, and how to change it               |
+|                                                          |                                                     |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| [From nothing to your own harness](docs/from-nothing.md) | Build one from an empty directory. Start here       |
+| [Getting started](docs/getting-started.md)               | You have built one before. Ten minutes              |
+| [User guide](docs/user-guide.md)                         | Every command, flag and verdict a harness inherits  |
+| [Configuration](docs/configuration.md)                   | The environment it reads, and what to commit        |
+| [Architecture](docs/architecture.md)                     | What is inside, and how to change it                |
 | [Why it exists](docs/why.md)                             | The problem it was extracted from, and the one rule |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                       | The shape a change should arrive in                |
-| [SECURITY.md](SECURITY.md)                               | The model, and where to report something           |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                       | The shape a change should arrive in                 |
+| [SECURITY.md](SECURITY.md)                               | The model, and where to report something            |
 
 ## Installing it
 
